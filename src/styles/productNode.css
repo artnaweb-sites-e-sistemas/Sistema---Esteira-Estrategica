@@ -1,0 +1,18 @@
+.product-node-texture {
+  position: relative;
+  background-color: #ffffff;
+  background-image: url('../assets/textures/textura.webp');
+  background-repeat: repeat;
+  background-size: auto;
+  border-style: dotted !important;
+  /* border-color: red; Removido, a cor será definida pelo Tailwind no componente */
+}
+
+.dark .product-node-texture {
+  /* background-color: #1f2937; Removido temporariamente para testar a cor da textura */
+  background-image: url('../assets/textures/textura-dark.webp');
+  background-repeat: repeat;
+  background-size: auto;
+}
+
+/* Removido o pseudo-elemento ::before e o keyframe gradient-shift */

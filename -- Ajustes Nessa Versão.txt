@@ -1,0 +1,91 @@
+Seguinte: como ainda tenho uma versão desse dashboard no Bolt.new, preciso manter um registro de todas as mudanças que você aplicar aqui no Cursor. Isso é importante porque, caso eu queira voltar a editar a versão do Bolt.new (que será a versão mais antiga), vou precisar garantir que todas as alterações feitas aqui também sejam aplicadas lá. Por isso, sempre que eu pedir uma alteração, preciso que você me retorne da seguinte forma:
+
+Para a sua solicitação: "texto do pedido", o comando para a IA reproduzir os mesmos ajustes no Bolt.new é: "comando gerado".
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------
+
+crie um ambiente para eu visualizar localmente meu dashboard e implemente a funcionalidade de compartilhamento público de funis:
+
+1. Instale o react-router-dom:
+npm install react-router-dom
+
+2. Substitua o conteúdo do arquivo src/main.tsx por:
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import App from './App.tsx';
+import { PublicFunnelViewer } from './components/PublicFunnelViewer';
+import './index.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <Routes>
+        {/* Rota pública para visualização de funil compartilhado */}
+        <Route path="/share/:funnelId" element={<PublicFunnelViewer />} />
+        
+        {/* Rota principal do app (requer autenticação) */}
+        <Route path="/*" element={<App />} />
+      </Routes>
+    </BrowserRouter>
+  </StrictMode>
+);
+
+3. No arquivo src/App.tsx, adicione a importação do useLocation e modifique a lógica de autenticação:
+- Adicione no início do arquivo: import { useLocation } from 'react-router-dom';
+- Adicione dentro do componente App: const location = useLocation();
+- Adicione a verificação de rota pública: const isPublicRoute = location.pathname.startsWith('/share/');
+- Modifique a condição de redirecionamento para login de:
+  if (!isAuthenticated) {
+para:
+  if (!isAuthenticated && !isPublicRoute) {
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+adicionar tema escuro/claro e melhorar a visualização dos produtos na página pública, permitindo ver os detalhes ao clicar
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+Adicionar a exibição do status nos cards dos produtos, estratégias de marketing e etapas do funil na página de visualização do link público.
+Importante: o status deve ser somente para visualização — não poderá ser editado diretamente nessa página pública.
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+
+1.  Configuração do Firebase e Regras de Segurança
+• Implementamos regras de segurança no Firestore para permitir:
+• Leitura de funis públicos para qualquer pessoa
+• Leitura e escrita de funis privados apenas para o dono
+• Criação de funis apenas para usuários autenticados
+
+2.  Funcionalidade de Visualização Pública
+• Implementamos o PublicFunnelViewer para exibir funis públicos
+• Adicionamos verificação de isPublic para controlar o acesso
+• Configuramos o roteamento para links públicos (/share/{funnelId})
+
+3.  Exibição de Status nos Cards
+• Modificamos o ProductNode e StepNode para exibir status em modo somente leitura
+• Implementamos a exibição visual dos status: "A fazer", "Em andamento", "Concluído" e "Pausado"
+• Garantimos que os status sejam visíveis mas não editáveis em visualização pública
+
+4.  Configuração do Servidor
+• Criamos o arquivo .htaccess para configurar o Apache
+• Implementamos regras de rewrite para suportar rotas do React Router
+• Adicionamos configurações de cache e compressão para otimização
+
+5.  Gerenciamento de Funis
+• Implementamos a função deleteFunnel para remover funis tanto do estado local quanto do Firestore
+• Adicionamos a funcionalidade de tornar funis públicos
+• Configuramos a geração de links públicos para compartilhamento
+
+6.  Interface do Usuário
+• Adicionamos suporte a tema claro/escuro
+• Implementamos visualização responsiva
+• Criamos modais e popups para detalhes dos produtos
+
+
