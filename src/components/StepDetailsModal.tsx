@@ -252,22 +252,6 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         </div>
 
         <div className="p-6 space-y-6">
-          {isTrafficOnly ? null : (
-            <div>
-              <label htmlFor="step-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Título da {isTrafficOnly ? 'Estratégia' : 'Etapa'} *
-              </label>
-              <input
-                type="text"
-                id="step-name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Nome da Etapa ou Estratégia"
-              />
-            </div>
-          )}
-
           {/* Tipo da Etapa/Estratégia */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -423,20 +407,6 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Descrição Resumida */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Descrição Resumida
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Breve descrição da etapa"
-            />
-          </div>
 
           {/* Descrição Detalhada com Markdown */}
           <div>

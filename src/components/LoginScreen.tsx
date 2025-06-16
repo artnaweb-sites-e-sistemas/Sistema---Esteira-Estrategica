@@ -101,7 +101,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Esteira Estratégica
+            Teste
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
             {isLoginMode ? 'Acesse sua conta para gerenciar seus funis de vendas' : 'Crie sua conta e comece a criar funis incríveis'}

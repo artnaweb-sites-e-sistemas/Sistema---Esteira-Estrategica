@@ -2,8 +2,6 @@ Seguinte: como ainda tenho uma versão desse dashboard no Bolt.new, preciso mant
 
 Para a sua solicitação: "texto do pedido", o comando para a IA reproduzir os mesmos ajustes no Bolt.new é: "comando gerado".
 
-tetetetete
-
 -----------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------------
 
