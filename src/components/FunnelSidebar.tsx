@@ -153,7 +153,7 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
           <div className="flex items-center space-x-2">
             <TrendingUp className={`w-6 h-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
             <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-              Teste
+              Esteira Estratégica
             </h2>
           </div>
           
