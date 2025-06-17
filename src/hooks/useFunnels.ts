@@ -139,7 +139,9 @@ export const useFunnels = () => {
         products: funnel.products || [],
         userId: user.id,
         updatedAt: serverTimestamp(),
-        isPublic: funnel.isPublic || false // Garantir que isPublic tenha um valor
+        isPublic: funnel.isPublic || false, // Garantir que isPublic tenha um valor
+        audienceTarget: funnel.audienceTarget || null,
+        audienceInsights: funnel.audienceInsights || null // Adicionar audienceInsights
       });
       
       if (isUpdate && funnel.id) {
@@ -264,38 +266,46 @@ export const useFunnels = () => {
 
   const deleteFunnel = async (funnelId: string) => {
     try {
-      console.log('🗑️ Deletando funil:', funnelId);
+      console.log('🗑️ Deletando funil (ID): ', funnelId);
       
       // Verificar se o funil existe localmente
       const funnel = funnels.find(f => f.id === funnelId);
       if (!funnel) {
-        console.log('❌ Funil não encontrado localmente');
+        console.log('❌ Funil não encontrado localmente para deletar.');
         return;
       }
+      console.log('Found funnel locally:', funnel.name);
 
       // Tentar deletar do Firestore
       try {
+        console.log('Attempting to delete from Firestore for ID:', funnelId);
         const funnelRef = doc(db, 'funnels', funnelId);
         await deleteDoc(funnelRef);
         console.log('✅ Funil deletado do Firestore:', funnelId);
       } catch (firestoreError) {
-        console.error('❌ Erro ao deletar do Firestore:', firestoreError);
+        console.error('❌ Erro ao deletar do Firestore para ID:', funnelId, firestoreError);
         // Continuar mesmo se houver erro no Firestore para manter a consistência local
       }
       
       // Remover da lista local
-      setFunnels(prev => prev.filter(f => f.id !== funnelId));
+      setFunnels(prev => {
+        const updatedFunnels = prev.filter(f => f.id !== funnelId);
+        console.log('Updated local funnels. New count:', updatedFunnels.length);
+        return updatedFunnels;
+      });
+
       if (activeFunnelId === funnelId) {
         const remaining = funnels.filter(f => f.id !== funnelId);
         setActiveFunnelId(remaining.length > 0 ? remaining[0].id : null);
+        console.log('Active funnel updated after deletion.', activeFunnelId);
       }
     } catch (error) {
-      console.error('❌ Erro ao deletar funil:', error);
+      console.error('❌ Erro geral ao deletar funil:', error);
       alert('Erro ao excluir o funil. Por favor, tente novamente.');
     }
   };
 
-  const updateFunnel = async (funnelId: string, updates: { name: string; description?: string }) => {
+  const updateFunnel = async (funnelId: string, updates: Partial<Funnel>) => {
     console.log('✏️ Atualizando funil:', funnelId, updates);
     
     const updatedFunnels = funnels.map(funnel => 

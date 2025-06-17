@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TrendingUp, Eye, EyeOff, Lock, User, UserPlus } from 'lucide-react';
 
 interface LoginScreenProps {
-  onLogin: (email: string, password: string) => void;
+  onLogin: (email: string, password: string, rememberMe: boolean) => void;
   onLoginWithGoogle?: () => void;
   onRegister?: (email: string, password: string, name: string) => void;
   isDarkMode: boolean;
@@ -24,6 +24,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +54,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     
     try {
       if (isLoginMode) {
-        await onLogin(email, password);
+        await onLogin(email, password, rememberMe);
       } else {
         if (onRegister) {
           await onRegister(email, password, name);
@@ -91,7 +92,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-blue-900/20 dark:via-gray-900/20 dark:to-indigo-900/20 flex items-center justify-center p-4 login-background-light">
+    <div className="min-h-screen flex items-center justify-center p-4 main-app-background">
       <div className="w-full max-w-md">
         {/* Logo e Título */}
         <div className="text-center mb-8">
@@ -255,21 +256,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
             )}
 
-            {/* Botão Principal */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{isLoginMode ? 'Entrando...' : 'Criando conta...'}</span>
+            {/* Botões */}
+            <div className="flex flex-col space-y-4 pt-4">
+              {/* Checkbox "Manter conectado" */}
+              {isLoginMode && (
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                    Manter-me conectado
+                  </label>
                 </div>
-              ) : (
-                isLoginMode ? 'Entrar' : 'Criar Conta'
               )}
-            </button>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>{isLoginMode ? 'Entrando...' : 'Criando conta...'}</span>
+                  </div>
+                ) : (
+                  isLoginMode ? 'Entrar' : 'Criar Conta'
+                )}
+              </button>
+            </div>
           </form>
 
           {/* Toggle entre Login/Cadastro */}

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Funnel, Product } from '../types';
 import { ProductNode } from './ProductNode';
 import { FunnelConnector } from './FunnelConnector';
 import { ProductDetailsModal } from './ProductDetailsModal';
 import { Plus, Eye, TrendingUp } from 'lucide-react';
+import { AudienceTargeting } from './AudienceTargeting';
+import type { AudienceTarget, AudienceInsights } from '../types/audience';
+import { AudienceInsightsCard } from './AudienceInsights';
 
 interface VisualFunnelBoardProps {
   funnel: Funnel;
@@ -14,6 +17,7 @@ interface VisualFunnelBoardProps {
   onAddProduct: (productData: any) => void;
   onMoveProduct: (productId: string, direction: 'up' | 'down') => void;
   onDeleteProduct: (productId: string) => void;
+  onUpdateFunnel: (funnelId: string, updates: Partial<Funnel>) => void;
   isDarkMode: boolean;
   isReadOnly?: boolean; // Nova prop para modo somente leitura
 }
@@ -27,11 +31,49 @@ export const VisualFunnelBoard: React.FC<VisualFunnelBoardProps> = ({
   onAddProduct,
   onMoveProduct,
   onDeleteProduct,
+  onUpdateFunnel,
   isDarkMode,
   isReadOnly = false
 }) => {
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [audienceTarget, setAudienceTarget] = useState<AudienceTarget>({
+    niche: '',
+    subNiche: '',
+    ageRange: { min: null, max: null },
+    gender: '',
+  });
+  const [audienceInsights, setAudienceInsights] = useState<AudienceInsights>({
+    mainPains: [''],
+    communicationTone: '',
+  });
   
+  useEffect(() => {
+    if (funnel?.audienceTarget) {
+      setAudienceTarget(funnel.audienceTarget);
+    } else {
+      setAudienceTarget({ niche: '', subNiche: '', ageRange: { min: null, max: null }, gender: '' });
+    }
+    if (funnel?.audienceInsights) {
+      setAudienceInsights(funnel.audienceInsights);
+    } else {
+      setAudienceInsights({ mainPains: [''], communicationTone: '' });
+    }
+  }, [funnel]);
+
+  const handleAudienceChange = (newAudience: AudienceTarget) => {
+    setAudienceTarget(newAudience);
+    if (funnel?.id) {
+      onUpdateFunnel(funnel.id, { audienceTarget: newAudience });
+    }
+  };
+
+  const handleInsightsChange = (newInsights: AudienceInsights) => {
+    setAudienceInsights(newInsights);
+    if (funnel?.id) {
+      onUpdateFunnel(funnel.id, { audienceInsights: newInsights });
+    }
+  };
+
   const sortedProducts = [...funnel.products].sort((a, b) => a.order - b.order);
 
   const handleCreateProduct = (productData: Partial<Product>) => {
@@ -72,7 +114,7 @@ export const VisualFunnelBoard: React.FC<VisualFunnelBoardProps> = ({
                       {funnel.name}
                     </h1>
                   </div>
-                  {funnel.description && (
+                  {funnel.description && !funnel.description.startsWith('Funil para ') && (
                     <p className="text-gray-600 dark:text-gray-300 text-base sm:text-lg ml-12">
                       {funnel.description}
                     </p>
@@ -90,7 +132,28 @@ export const VisualFunnelBoard: React.FC<VisualFunnelBoardProps> = ({
             </div>
           </div>
 
-          <div className="relative mt-16">
+          <div className="w-full md:w-full lg:w-full mt-10 lg:ml-5 lg:mr-auto lg:pr-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <AudienceTargeting
+                  audience={audienceTarget}
+                  onChange={handleAudienceChange}
+                  isDarkMode={isDarkMode}
+                  isReadOnly={isReadOnly}
+                />
+              </div>
+              <div>
+                <AudienceInsightsCard
+                  insights={audienceInsights}
+                  onChange={handleInsightsChange}
+                  isDarkMode={isDarkMode}
+                  isReadOnly={isReadOnly}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mt-10">
             <div className="space-y-4">
               {sortedProducts.map((product, index) => (
                 <div key={product.id} className="relative">

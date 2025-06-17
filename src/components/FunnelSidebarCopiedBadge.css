@@ -1,0 +1,18 @@
+/* Badge de copiado animado para FunnelSidebar */
+.copied-badge-animate {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  animation: copiedBadgeFadeInUp 0.35s cubic-bezier(0.4,0,0.2,1) forwards;
+  pointer-events: none;
+}
+
+@keyframes copiedBadgeFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+} 

@@ -5,6 +5,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { FunnelSidebar } from './components/FunnelSidebar';
 import { VisualFunnelBoard } from './components/VisualFunnelBoard';
 import { CreateFunnelModal } from './components/CreateFunnelModal';
+import { AudienceTargeting } from './components/AudienceTargeting';
+import { AudienceTarget } from './types/audience';
 import { TrendingUp, Target, Zap, Sun, Moon, Menu, ChevronRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
@@ -261,6 +263,10 @@ function App() {
           </div>
         </div>
 
+        <div className="p-6">
+          {/* AudienceTargeting component */}
+        </div>
+
         {activeFunnel ? (
           <VisualFunnelBoard
             funnel={activeFunnel}
@@ -271,6 +277,7 @@ function App() {
             onAddProduct={(productData) => addProduct(activeFunnelId!, productData)}
             onMoveProduct={(productId, direction) => moveProduct(activeFunnelId!, productId, direction)}
             onDeleteProduct={(productId) => deleteProduct(activeFunnelId!, productId)}
+            onUpdateFunnel={updateFunnel}
             isDarkMode={isDarkMode}
           />
         ) : (

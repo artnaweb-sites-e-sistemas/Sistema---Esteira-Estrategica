@@ -1,3 +1,5 @@
+import { AudienceTarget, AudienceInsights } from './audience';
+
 export interface Step {
   id: string;
   name: string;
@@ -86,6 +88,8 @@ export interface Funnel {
   updatedAt: string;
   isPublic?: boolean;
   publicUrl?: string;
+  audienceTarget?: AudienceTarget;
+  audienceInsights?: AudienceInsights;
 }
 
 export type StepStatus = 'todo' | 'in-progress' | 'completed' | 'paused';

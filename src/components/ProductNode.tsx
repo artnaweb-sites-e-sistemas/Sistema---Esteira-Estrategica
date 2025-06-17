@@ -347,12 +347,12 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
               <div title={isExpanded ? "Recolher produto" : "Expandir produto"}>
                 {isExpanded ? (
                   <FoldVertical
-                    className="w-4 h-4 cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    className="w-4 h-4 cursor-pointer text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(false); }}
                   />
                 ) : (
                   <UnfoldVertical
-                    className={`w-4 h-4 cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 ${!isExpanded ? 'animate-pulse' : ''}`}
+                    className={`w-4 h-4 cursor-pointer text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 ${!isExpanded ? 'animate-pulse' : ''}`}
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(true); }}
                   />
                 )}

@@ -19,6 +19,8 @@ import {
   Globe,
   Lock
 } from 'lucide-react';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
+import './FunnelSidebarCopiedBadge.css';
 
 interface FunnelSidebarProps {
   funnels: Funnel[];
@@ -58,6 +60,9 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
   const [editingFunnelId, setEditingFunnelId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [makingPublic, setMakingPublic] = useState<string | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [funnelToDeleteId, setFunnelToDeleteId] = useState<string | null>(null);
+  const [copiedFunnelId, setCopiedFunnelId] = useState<string | null>(null);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
@@ -84,8 +89,8 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
       // Fallback para link simples se não houver função de tornar público
       const shareLink = generateShareLink(funnelId);
       navigator.clipboard.writeText(shareLink).then(() => {
-        setShareModalOpen(funnelId);
-        setTimeout(() => setShareModalOpen(null), 3000);
+        setCopiedFunnelId(funnelId);
+        setTimeout(() => setCopiedFunnelId(null), 2000);
       });
       return;
     }
@@ -103,9 +108,8 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
         // Copiar para clipboard
         await navigator.clipboard.writeText(shareLink);
         
-        // Mostrar confirmação
-        setShareModalOpen(funnelId);
-        setTimeout(() => setShareModalOpen(null), 5000);
+        setCopiedFunnelId(funnelId);
+        setTimeout(() => setCopiedFunnelId(null), 2000);
       } else {
         alert('Erro ao tornar funil público. Tente novamente.');
       }
@@ -135,6 +139,25 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
   const handleCancelEdit = () => {
     setEditingFunnelId(null);
     setEditingName('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (funnelToDeleteId) {
+      await onDeleteFunnel(funnelToDeleteId);
+      setIsConfirmModalOpen(false);
+      setFunnelToDeleteId(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsConfirmModalOpen(false);
+    setFunnelToDeleteId(null);
+  };
+
+  const handleShowDeleteConfirm = (funnelId: string) => {
+    setFunnelToDeleteId(funnelId);
+    setIsConfirmModalOpen(true);
+    setOpenMenuId(null); // Fechar o menu de opções do funil
   };
 
   return (
@@ -205,7 +228,7 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
             <p className="text-sm">Clique em "Novo Funil" para começar</p>
           </div>
         ) : (
-          <div className="p-2">
+          <div className="pb-2">
             {funnels.map((funnel) => {
               const progress = getFunnelProgress(funnel);
               const isActive = funnel.id === activeFunnelId;
@@ -251,14 +274,14 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                           <div className="flex items-center space-x-1 mt-1">
                             <button
                               onClick={() => handleSaveEdit(funnel.id)}
-                              className="p-1 text-green-500 hover:text-green-600 transition-colors"
+                              className={`p-1 text-green-500 hover:text-green-600 transition-colors`}
                               title="Salvar"
                             >
                               <Check className="w-3 h-3" />
                             </button>
                             <button
                               onClick={handleCancelEdit}
-                              className="p-1 text-red-500 hover:text-red-600 transition-colors"
+                              className={`p-1 text-red-500 hover:text-red-600 transition-colors`}
                               title="Cancelar"
                             >
                               <XIcon className="w-3 h-3" />
@@ -324,7 +347,7 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                             handleShare(funnel.id);
                           }}
                           disabled={isBeingShared}
-                          className={`p-1 transition-colors opacity-0 group-hover:opacity-100 ${
+                          className={`relative p-1 transition-colors opacity-0 group-hover:opacity-100 ${
                             isBeingShared
                               ? 'text-blue-500 animate-pulse'
                               : isActive && !isDarkMode 
@@ -339,6 +362,12 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                             <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <Share2 className="w-4 h-4" />
+                          )}
+                          {/* Badge de copiado animado, centralizado abaixo do ícone */}
+                          {copiedFunnelId === funnel.id && !isBeingShared && (
+                            <span className="copied-badge-animate absolute left-1/2 -translate-x-1/2 top-[calc(100%+10px)] bg-green-600 text-white text-[11px] px-3 py-1 rounded shadow-lg border border-green-700 font-medium z-20 select-none">
+                              Copiado
+                            </span>
                           )}
                         </button>
 
@@ -403,10 +432,7 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm('Tem certeza que deseja excluir este funil?')) {
-                                      onDeleteFunnel(funnel.id);
-                                    }
-                                    setOpenMenuId(null);
+                                    handleShowDeleteConfirm(funnel.id);
                                   }}
                                   className={`w-full flex items-center space-x-2 px-3 py-2 text-sm text-red-400 transition-colors ${
                                     isDarkMode 
@@ -424,23 +450,6 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                       </div>
                     )}
                   </div>
-
-                  {/* Modal de confirmação de compartilhamento */}
-                  {shareModalOpen === funnel.id && (
-                    <div className="absolute inset-x-0 top-0 z-30 mx-2">
-                      <div className="bg-green-600 text-white rounded-lg p-3 shadow-lg border border-green-500">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Globe className="w-4 h-4" />
-                          <p className="text-xs font-medium">
-                            ✓ Funil tornado público!
-                          </p>
-                        </div>
-                        <p className="text-xs opacity-90">
-                          Link copiado para a área de transferência. Qualquer pessoa com o link pode visualizar este funil.
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -491,6 +500,15 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmModalOpen}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        message={`Tem certeza que deseja excluir o funil \"${funnels.find(f => f.id === funnelToDeleteId)?.name || 'este funil'}\"? Esta ação não pode ser desfeita.`}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

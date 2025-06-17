@@ -110,7 +110,7 @@ export const PublicFunnelViewer: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen main-app-background bg-gray-50 dark:bg-gray-900">
       {/* Header público */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -143,11 +143,6 @@ export const PublicFunnelViewer: React.FC = () => {
                 <Moon className="w-5 h-5" />
               )}
             </button>
-
-            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Público</span>
-            </div>
           </div>
         </div>
       </div>
@@ -164,6 +159,7 @@ export const PublicFunnelViewer: React.FC = () => {
         onDeleteProduct={() => {}} // Desabilitado para visualização pública
         isDarkMode={isDarkMode}
         isReadOnly={true} // Prop para indicar modo somente leitura
+        onUpdateFunnel={() => {}} // Corrige linter: função dummy
       />
 
       {/* Footer */}
