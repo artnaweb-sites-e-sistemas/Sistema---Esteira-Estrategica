@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Funnel } from '../types';
 import { defaultProducts } from '../data/defaultProducts';
+import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface CreateFunnelModalProps {
   isOpen: boolean;
@@ -15,6 +16,12 @@ export function CreateFunnelModal({ isOpen, onClose, onSave }: CreateFunnelModal
     description: '',
     useTemplate: true // Novo campo para controlar se usa template ou não
   });
+  const [initialData, setInitialData] = useState({
+    name: '',
+    description: '',
+    useTemplate: true
+  });
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   // Resetar o formulário quando o modal é fechado
   const handleClose = () => {
@@ -23,7 +30,27 @@ export function CreateFunnelModal({ isOpen, onClose, onSave }: CreateFunnelModal
       description: '',
       useTemplate: true
     });
+    setInitialData({
+      name: '',
+      description: '',
+      useTemplate: true
+    });
     onClose();
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      setInitialData({
+        name: formData.name,
+        description: formData.description,
+        useTemplate: formData.useTemplate
+      });
+    }
+    // eslint-disable-next-line
+  }, [isOpen]);
+
+  const isDirty = () => {
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -59,8 +86,24 @@ export function CreateFunnelModal({ isOpen, onClose, onSave }: CreateFunnelModal
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && !window.getSelection()?.toString()) {
-      handleClose();
+      if (isDirty()) {
+        setShowUnsavedModal(true);
+      } else {
+        handleClose();
+      }
     }
+  };
+
+  const handleDiscard = () => {
+    setShowUnsavedModal(false);
+    handleClose();
+  };
+
+  const handleSaveFromModal = () => {
+    setShowUnsavedModal(false);
+    // Simular submit do formulário
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleSubmit(fakeEvent);
   };
 
   if (!isOpen) return null;
@@ -165,6 +208,12 @@ export function CreateFunnelModal({ isOpen, onClose, onSave }: CreateFunnelModal
           </form>
         </div>
       </div>
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleSaveFromModal}
+        onDiscard={handleDiscard}
+        onClose={() => setShowUnsavedModal(false)}
+      />
     </div>
   );
 }

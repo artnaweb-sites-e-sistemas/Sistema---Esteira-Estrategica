@@ -13,6 +13,7 @@ import {
   Trash2
 } from 'lucide-react';
 import '../styles/modalStyles.css';
+import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface StepDetailsModalProps {
   step: Step | null;
@@ -37,51 +38,68 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     name: step?.name || '',
     description: step?.description || '',
     detailedDescription: step?.detailedDescription || '',
-    type: step?.type || (isTrafficOnly ? 'traffic' : 'page') as StepType,
+    type: (step?.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
     link: step?.link || '',
     notes: step?.notes || '',
     upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
     relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step?.type || '') ? (step?.relatedProducts || ['']) : [],
     isCustom: step?.isCustom || false
   });
-
+  const [initialData, setInitialData] = useState({
+    name: step?.name || '',
+    description: step?.description || '',
+    detailedDescription: step?.detailedDescription || '',
+    type: (step?.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
+    link: step?.link || '',
+    notes: step?.notes || '',
+    upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
+    relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step?.type || '') ? (step?.relatedProducts || ['']) : [],
+    isCustom: step?.isCustom || false
+  });
   const [selectedStrategy, setSelectedStrategy] = useState(
     step?.type === 'traffic' ? (step?.notes || 'facebook-ads') : 'facebook-ads'
   );
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   useEffect(() => {
     if (isCreating && isOpen) {
-      setFormData({
+      const data = {
         name: '',
         description: '',
         detailedDescription: '',
-        type: isTrafficOnly ? 'traffic' : 'page',
+        type: (isTrafficOnly ? 'traffic' : 'page') as StepType,
         link: '',
         notes: '',
         upsellProducts: [''],
         relatedProducts: [''],
         isCustom: false
-      });
+      };
+      setFormData(data);
+      setInitialData(data);
       setSelectedStrategy('facebook-ads');
     } else if (step && isOpen) {
-      setFormData({
+      const data = {
         name: step.name || '',
         description: step.description || '',
         detailedDescription: step.detailedDescription || '',
-        type: step.type || (isTrafficOnly ? 'traffic' : 'page'),
+        type: (step.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
         link: step.link || '',
         notes: step.notes || '',
         upsellProducts: step.type === 'checkout' ? (step.upsellProducts || ['']) : [],
         relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step.type) ? (step.relatedProducts || ['']) : [],
         isCustom: step.isCustom || false
-      });
+      };
+      setFormData(data);
+      setInitialData(data);
       if (step.type === 'traffic') {
         setSelectedStrategy(step.notes || 'facebook-ads');
       }
     }
   }, [isCreating, isOpen, step, isTrafficOnly]);
 
-  if (!isOpen) return null;
+  const isDirty = () => {
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  };
 
   const handleSave = () => {
     let saveData: Partial<Step>;
@@ -136,8 +154,22 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && !window.getSelection()?.toString()) {
-      onClose();
+      if (isDirty()) {
+        setShowUnsavedModal(true);
+      } else {
+        onClose();
+      }
     }
+  };
+
+  const handleDiscard = () => {
+    setShowUnsavedModal(false);
+    onClose();
+  };
+
+  const handleSaveFromModal = () => {
+    setShowUnsavedModal(false);
+    handleSave();
   };
 
   const addUpsellProduct = () => {
@@ -224,6 +256,8 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         return 'Produtos Relacionados';
     }
   };
+
+  if (!isOpen) return null;
 
   return ReactDOM.createPortal(
     <div 
@@ -523,6 +557,13 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
           </div>
         </div>
       </div>
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleSaveFromModal}
+        onDiscard={handleDiscard}
+        onClose={() => setShowUnsavedModal(false)}
+        isDarkMode={isDarkMode}
+      />
     </div>,
     document.body
   );

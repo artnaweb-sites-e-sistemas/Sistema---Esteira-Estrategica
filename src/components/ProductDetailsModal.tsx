@@ -11,6 +11,7 @@ import {
 import ReactDOM from 'react-dom';
 import { productBlockTypes } from '../data/productBlockTypes';
 import '../styles/modalStyles.css';
+import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface ProductDetailsModalProps {
   product: Product | null;
@@ -44,38 +45,63 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
     link: product?.link || '',
     notes: product?.notes || '',
   });
-
+  const [initialData, setInitialData] = useState({
+    type: product?.type || '',
+    description: product?.description || '',
+    detailedDescription: product?.detailedDescription || '',
+    link: product?.link || '',
+    notes: product?.notes || '',
+  });
   const [isCustomType, setIsCustomType] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
 
   useEffect(() => {
     if (isCreating && isOpen) {
       setFormData(initialFormData);
+      setInitialData(initialFormData);
       setIsCustomType(false);
     } else if (product && isOpen) {
-      setFormData({
+      const data = {
         type: product.type || '',
         description: product.description || '',
         detailedDescription: product.detailedDescription || '',
         link: product.link || '',
         notes: product.notes || '',
-      });
+      };
+      setFormData(data);
+      setInitialData(data);
       setIsCustomType(!Object.keys(productBlockTypes).includes(product.type || ''));
     }
   }, [isCreating, isOpen, product]);
 
-  if (!isOpen) return null;
+  const isDirty = () => {
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  };
 
   const handleSave = () => {
     const typeToSave = isCustomType && !formData.type.trim() ? 'Personalizado' : formData.type;
-
     onSave({ ...formData, type: typeToSave });
     onClose();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && !window.getSelection()?.toString()) {
-      onClose();
+      if (isDirty()) {
+        setShowUnsavedModal(true);
+      } else {
+        onClose();
+      }
     }
+  };
+
+  const handleDiscard = () => {
+    setShowUnsavedModal(false);
+    onClose();
+  };
+
+  const handleSaveFromModal = () => {
+    setShowUnsavedModal(false);
+    handleSave();
   };
 
   const insertMarkdown = (before: string, after: string = '') => {
@@ -96,6 +122,8 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
       textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length);
     }, 0);
   };
+
+  if (!isOpen) return null;
 
   return ReactDOM.createPortal(
     <div 
@@ -303,6 +331,13 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
           </div>
         </div>
       </div>
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onSave={handleSaveFromModal}
+        onDiscard={handleDiscard}
+        onClose={() => setShowUnsavedModal(false)}
+        isDarkMode={isDarkMode}
+      />
     </div>,
     document.body
   );
