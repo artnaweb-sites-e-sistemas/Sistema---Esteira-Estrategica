@@ -112,7 +112,7 @@ export const StepDetailsPopup: React.FC<StepDetailsPopupProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={onEdit}
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
                 className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
                 title="Editar"
               >

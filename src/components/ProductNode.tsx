@@ -29,9 +29,27 @@ import {
   StickyNote as StickyNoteIcon,
   CreditCard,
   Users,
-  Star
+  Star,
+  GripVertical,
+  Grip
 } from 'lucide-react';
 import '../styles/productNode.css';
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  rectSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ProductNodeProps {
   product: Product;
@@ -93,6 +111,202 @@ const productItemStatusLabels = {
   completed: 'Concluído'
 };
 
+// Componente SortableProductCard para uso com dnd-kit
+interface SortableProductCardProps {
+  productItem: ProductItem;
+  index: number;
+  onClick: () => void;
+  isReadOnly: boolean;
+  setShowDeleteConfirm: (idx: number) => void;
+  handleProductItemClick: (item: ProductItem) => void;
+  handleProductItemStatusChange: (idx: number, status: 'todo' | 'in-progress' | 'completed') => void;
+}
+
+const SortableProductCard = React.memo(function SortableProductCard({ productItem, index, onClick, isReadOnly, setShowDeleteConfirm, handleProductItemClick, handleProductItemStatusChange }: SortableProductCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: productItem.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition || 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+    zIndex: isDragging ? 50 : 'auto',
+    boxShadow: isDragging ? '0 0 0 4px #3b82f6' : undefined
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700 shadow-sm hover:shadow-md transition-all cursor-pointer group relative flex flex-col h-full transition-transform duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+      onClick={() => handleProductItemClick(productItem)}
+    >
+      {/* Botões de ação - apenas se não for somente leitura */}
+      {!isReadOnly && (
+        <div className="absolute top-3 right-3 flex items-center space-x-1 transition-all z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleProductItemClick(productItem);
+            }}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-all"
+            title="Editar produto"
+          >
+            <Edit3 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDeleteConfirm(index);
+            }}
+            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+            title="Excluir produto"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {/* Conteúdo principal do card */}
+      <div className="flex-grow">
+        <div className={`flex items-center space-x-2 mb-3 ${!isReadOnly ? 'pr-12' : ''}`}>
+          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{productItem.name}</span>
+        </div>
+        {/* Promessa do produto */}
+        {productItem.promessa && (
+          <div className="mb-3">
+            <div className="flex items-start space-x-2">
+              <StickyNoteIcon className="w-3 h-3 text-gray-400 mt-[3px] flex-shrink-0" />
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {productItem.promessa}
+              </p>
+            </div>
+            {/* Tipo de Oferta abaixo da promessa */}
+            {productItem.offerType && (
+              <div className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-semibold ${
+                productItem.offerType === 'inicial'
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+              }`}>
+                {productItem.offerType === 'inicial' ? 'Oferta Inicial' : 'Oferta de Upsell'}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Estatísticas */}
+        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+          {productItem.modules && productItem.modules.length > 0 && (
+            <div>📚 Módulos: {productItem.modules.length}</div>
+          )}
+          {productItem.lessons && productItem.lessons.length > 0 && (
+            <div>🎥 Aulas: {productItem.lessons.length}</div>
+          )}
+          {productItem.bonuses && productItem.bonuses.length > 0 && (
+            <div>🎁 Bônus: {productItem.bonuses.length}</div>
+          )}
+          {productItem.hasAffiliates && (
+            <div className="text-blue-600 dark:text-blue-400 font-medium">👥 Com afiliados</div>
+          )}
+        </div>
+      </div>
+      {/* Rodapé do card com valor e status */}
+      <div className="mt-3 space-y-2">
+        {/* Valor do produto */}
+        {productItem.value && (
+          <div className="flex items-center space-x-2">
+            <CreditCard className="w-3 h-3 text-gray-400 flex-shrink-0" />
+            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(productItem.value)}
+            </span>
+          </div>
+        )}
+        {/* Status do produto */}
+        <div className="flex gap-1 flex-wrap">
+          {(['todo', 'in-progress', 'completed'] as const).map((status) => {
+            const config = productItemStatusConfig[status];
+            const StatusIcon = config.icon;
+            const isSelected = productItem.status === status;
+            if (isReadOnly && !isSelected) return null;
+            return (
+              <div
+                key={status}
+                className={`px-2 py-1 text-xs rounded-full transition-colors flex items-center space-x-1 ${
+                  isSelected
+                    ? `${config.bg} ${config.color} border ${config.border}`
+                    : isReadOnly 
+                      ? 'hidden'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                onClick={(e) => {
+                  if (!isReadOnly) {
+                    e.stopPropagation();
+                    handleProductItemStatusChange(index, status);
+                  }
+                }}
+              >
+                <div className="flex-shrink-0 flex items-center justify-center w-3 h-3">
+                  <StatusIcon className="w-3 h-3" />
+                </div>
+                <span>{productItemStatusLabels[status]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Adicionar componente SortableTrafficStepNode
+interface SortableTrafficStepNodeProps {
+  step: Step;
+  index: number;
+  onUpdate: (updates: Partial<Step>) => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  isDarkMode: boolean;
+  isReadOnly?: boolean;
+  isDashedBorder?: boolean;
+  className?: string;
+}
+
+function SortableTrafficStepNode({ step, index, onUpdate, onDelete, onEdit, isDarkMode, isReadOnly, isDashedBorder, className }: SortableTrafficStepNodeProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: step.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition || 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+    zIndex: isDragging ? 50 : 'auto',
+    boxShadow: isDragging ? '0 0 0 4px #3b82f6' : undefined
+  };
+  return (
+    <div ref={setNodeRef} style={style} className={className}>
+      <StepNode
+        step={step}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onEdit={onEdit}
+        isDarkMode={isDarkMode}
+        isReadOnly={isReadOnly}
+        isDashedBorder={isDashedBorder}
+        listeners={listeners}
+        attributes={attributes}
+      />
+    </div>
+  );
+}
+
 export const ProductNode: React.FC<ProductNodeProps> = ({
   product,
   onUpdateProduct,
@@ -118,6 +332,8 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
   const [showDeleteProductConfirm, setShowDeleteProductConfirm] = useState(false);
   const [showEditStepModal, setShowEditStepModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
+  const [activeProductItemId, setActiveProductItemId] = useState<string | null>(null);
+  const [activeTrafficStepId, setActiveTrafficStepId] = useState<string | null>(null);
   
   const config = statusConfig[product.status];
   const StatusIcon = config.icon;
@@ -191,7 +407,8 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
       notes: stepData.notes,
       upsellProducts: stepData.upsellProducts,
       relatedProducts: stepData.relatedProducts,
-      isCustom: stepData.isCustom
+      isCustom: stepData.isCustom,
+      ...(typeof stepData.downsellValue !== 'undefined' ? { downsellValue: stepData.downsellValue } : {})
     };
     onAddStep(newStep);
   };
@@ -325,6 +542,40 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
       if (aOrder !== bOrder) return aOrder - bOrder;
       return a.order - b.order;
     });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+  const handleProductItemsDndEnd = (event: any) => {
+    const { active, over } = event;
+    const items = product.productItems || [];
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex(item => item.id === active.id);
+    const newIndex = items.findIndex(item => item.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newItems = arrayMove(items, oldIndex, newIndex);
+    onUpdateProduct({ productItems: newItems });
+  };
+
+  const handleTrafficStepsDndEnd = (event: any) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = trafficSteps.findIndex(step => step.id === active.id);
+    const newIndex = trafficSteps.findIndex(step => step.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newSteps = arrayMove(trafficSteps, oldIndex, newIndex);
+    // Atualiza a ordem dos steps no produto
+    const allSteps = [
+      ...newSteps,
+      ...otherSteps
+    ];
+    allSteps.forEach((step, idx) => {
+      if (step.order !== idx) {
+        onUpdateStep(step.id, { order: idx });
+      }
+    });
+    onUpdateProduct({ steps: allSteps });
+  };
 
   return (
     <div className={`product-node-texture bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-600 shadow-sm p-4 transition-all duration-300 ${isExpanded ? 'min-h-[250px]' : ''}`}>
@@ -473,145 +724,78 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                 )}
               </div>
               <div className="bg-gradient-to-r from-blue-50 to-blue-50 dark:from-blue-900 dark:to-blue-900 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-4 sm:p-6 shadow-sm">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {product.productItems && product.productItems.map((productItem, index) => (
-                    <div 
-                      key={productItem.id} 
-                      className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700 shadow-sm hover:shadow-md transition-all cursor-pointer group relative flex flex-col h-full"
-                      onClick={() => handleProductItemClick(productItem)}
-                    >
-                      {/* Botões de ação - apenas se não for somente leitura */}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={(event) => {
+                    setActiveProductItemId(event.active?.id ? String(event.active.id) : null);
+                  }}
+                  onDragCancel={() => setActiveProductItemId(null)}
+                  onDragOver={() => {}}
+                  onDragMove={() => {}}
+                  onDragEnd={(event) => {
+                    setActiveProductItemId(null);
+                    if (!isReadOnly) handleProductItemsDndEnd(event);
+                  }}
+                >
+                  <SortableContext items={(product.productItems || []).map(item => item.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(product.productItems || []).map((productItem, index) => (
+                        <SortableProductCard
+                          key={productItem.id}
+                          productItem={productItem}
+                          index={index}
+                          onClick={() => handleProductItemClick(productItem)}
+                          isReadOnly={isReadOnly}
+                          setShowDeleteConfirm={setShowDeleteConfirm}
+                          handleProductItemClick={handleProductItemClick}
+                          handleProductItemStatusChange={handleProductItemStatusChange}
+                        />
+                      ))}
+                      {/* Card para adicionar novo produto - apenas se não for somente leitura */}
                       {!isReadOnly && (
-                        <div className="absolute top-2 right-2 flex items-center space-x-1 transition-all">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowDeleteConfirm(index);
-                            }}
-                            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
-                            title="Excluir produto"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleProductItemClick(productItem);
-                            }}
-                            className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-all"
-                            title="Editar produto"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
+                        <div 
+                          onClick={handleCreateProductItem}
+                          className="bg-white dark:bg-gray-800 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"
+                        >
+                          <div className="bg-blue-200 dark:bg-blue-800 group-hover:bg-blue-300 dark:group-hover:bg-blue-700 rounded-full p-3 mb-2 transition-colors">
+                            <Plus className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                          </div>
+                          <p className="text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 font-medium text-sm">
+                            Adicionar Bloco
+                          </p>
                         </div>
                       )}
-
-                      {/* Conteúdo principal do card */}
-                      <div className="flex-grow">
-                        <div className={`flex items-center space-x-2 mb-3 ${!isReadOnly ? 'pr-12' : ''}`}>
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{productItem.name}</span>
+                      {(!product.productItems || product.productItems.length === 0) && (
+                        <div className="col-span-full text-center py-4">
+                          <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhum produto específico cadastrado</p>
                         </div>
-                        
-                        {/* Promessa do produto */}
-                        {productItem.promessa && (
-                          <div className="mb-3">
-                            <div className="flex items-start space-x-2">
-                              <StickyNoteIcon className="w-3 h-3 text-gray-400 mt-[3px] flex-shrink-0" />
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                {productItem.promessa}
-                              </p>
-                            </div>
+                      )}
+                    </div>
+                  </SortableContext>
+                  {/* DragOverlay para visualização fluida do item arrastado */}
+                  <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}>
+                    {activeProductItemId ? (
+                      (() => {
+                        const draggingItem = (product.productItems || []).find(item => item.id === activeProductItemId);
+                        if (!draggingItem) return null;
+                        return (
+                          <div style={{ opacity: 0.95 }}>
+                            <SortableProductCard
+                              productItem={draggingItem}
+                              index={-1}
+                              onClick={() => {}}
+                              isReadOnly={true}
+                              setShowDeleteConfirm={() => {}}
+                              handleProductItemClick={() => {}}
+                              handleProductItemStatusChange={() => {}}
+                            />
                           </div>
-                        )}
-                        
-                        {/* Estatísticas */}
-                        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                          {productItem.modules && productItem.modules.length > 0 && (
-                            <div>📚 Módulos: {productItem.modules.length}</div>
-                          )}
-                          {productItem.lessons && productItem.lessons.length > 0 && (
-                            <div>🎥 Aulas: {productItem.lessons.length}</div>
-                          )}
-                          {productItem.bonuses && productItem.bonuses.length > 0 && (
-                            <div>🎁 Bônus: {productItem.bonuses.length}</div>
-                          )}
-                          {productItem.hasAffiliates && (
-                            <div className="text-blue-600 dark:text-blue-400 font-medium">👥 Com afiliados</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Rodapé do card com valor e status */}
-                      <div className="mt-3 space-y-2">
-                        {/* Valor do produto */}
-                        {productItem.value && (
-                          <div className="flex items-center space-x-2">
-                            <CreditCard className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(productItem.value)}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Status do produto - sempre visível, mas sem interação em modo somente leitura */}
-                        <div className="flex gap-1 flex-wrap">
-                          {(['todo', 'in-progress', 'completed'] as const).map((status) => {
-                            const config = productItemStatusConfig[status];
-                            const StatusIcon = config.icon;
-                            const isSelected = productItem.status === status;
-                            // Em modo somente leitura, mostra apenas o status atual
-                            if (isReadOnly && !isSelected) return null;
-                            return (
-                              <div
-                                key={status}
-                                className={`px-2 py-1 text-xs rounded-full transition-colors flex items-center space-x-1 ${
-                                  isSelected
-                                    ? `${config.bg} ${config.color} border ${config.border}`
-                                    : isReadOnly 
-                                      ? 'hidden' // Esconde os outros status em modo somente leitura
-                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                }`}
-                                onClick={(e) => {
-                                  if (!isReadOnly) {
-                                    e.stopPropagation();
-                                    handleProductItemStatusChange(index, status);
-                                  }
-                                }}
-                              >
-                                <div className="flex-shrink-0 flex items-center justify-center w-3 h-3">
-                                  <StatusIcon className="w-3 h-3" />
-                                </div>
-                                <span>{productItemStatusLabels[status]}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {/* Card para adicionar novo produto - apenas se não for somente leitura */}
-                  {!isReadOnly && (
-                    <div 
-                      onClick={handleCreateProductItem}
-                      className="bg-white dark:bg-gray-800 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group"
-                    >
-                      <div className="bg-blue-200 dark:bg-blue-800 group-hover:bg-blue-300 dark:group-hover:bg-blue-700 rounded-full p-3 mb-2 transition-colors">
-                        <Plus className="w-5 h-5 text-blue-600 dark:text-blue-300" />
-                      </div>
-                      <p className="text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 font-medium text-sm">
-                        Adicionar Bloco
-                      </p>
-                    </div>
-                  )}
-                  
-                  {(!product.productItems || product.productItems.length === 0) && (
-                    <div className="col-span-full text-center py-4">
-                      <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhum produto específico cadastrado</p>
-                    </div>
-                  )}
-                </div>
+                        );
+                      })()
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               </div>
             </div>
 
@@ -635,39 +819,85 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
-                {trafficSteps.map((step) => (
-                  <StepNode
-                    key={step.id}
-                    step={step}
-                    onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(step.id, updates)}
-                    onDelete={isReadOnly ? () => {} : () => onDeleteStep(step.id)}
-                    onEdit={() => handleStepEdit(step)}
-                    isDarkMode={isDarkMode}
-                    isReadOnly={isReadOnly}
-                    isDashedBorder={false}
-                    className="h-full"
-                  />
-                ))}
-                
-                {/* Card vazio para adicionar estratégia personalizada - apenas se não for somente leitura */}
-                {!isReadOnly && (
-                  <div 
-                    onClick={() => {
-                      setIsTrafficOnly(true);
-                      setShowCreateStepModal(true);
-                    }}
-                    className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group h-full"
-                  >
-                    <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 rounded-full p-3 mb-3 transition-colors">
-                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium text-sm">
-                      Adicionar Estratégia
-                    </p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={(event) => {
+                  setActiveTrafficStepId(event.active?.id ? String(event.active.id) : null);
+                }}
+                onDragCancel={() => setActiveTrafficStepId(null)}
+                onDragOver={() => {}}
+                onDragMove={() => {}}
+                onDragEnd={(event) => {
+                  setActiveTrafficStepId(null);
+                  handleTrafficStepsDndEnd(event);
+                }}
+              >
+                <SortableContext items={trafficSteps.map(step => step.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
+                    {trafficSteps.map((step, index) => (
+                      <SortableTrafficStepNode
+                        key={step.id}
+                        step={step}
+                        index={index}
+                        onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(step.id, updates)}
+                        onDelete={isReadOnly ? () => {} : () => onDeleteStep(step.id)}
+                        onEdit={() => handleStepEdit(step)}
+                        isDarkMode={isDarkMode}
+                        isReadOnly={isReadOnly}
+                        isDashedBorder={false}
+                        className="h-full"
+                      />
+                    ))}
+                    {/* Card vazio para adicionar estratégia personalizada - apenas se não for somente leitura */}
+                    {!isReadOnly && (
+                      <div 
+                        onClick={() => {
+                          setIsTrafficOnly(true);
+                          setShowCreateStepModal(true);
+                        }}
+                        className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group h-full"
+                      >
+                        <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 rounded-full p-3 mb-3 transition-colors">
+                          <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                        </div>
+                        <p className="text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium text-sm">
+                          Adicionar Estratégia
+                        </p>
+                      </div>
+                    )}
+                    {trafficSteps.length === 0 && (
+                      <div className="col-span-full text-center py-4">
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhuma estratégia cadastrada</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </SortableContext>
+                <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}>
+                  {activeTrafficStepId ? (
+                    (() => {
+                      const draggingStep = trafficSteps.find(step => step.id === activeTrafficStepId);
+                      if (!draggingStep) return null;
+                      return (
+                        <div style={{ opacity: 0.95 }}>
+                          <StepNode
+                            step={draggingStep}
+                            onUpdate={() => {}}
+                            onDelete={() => {}}
+                            onEdit={() => {}}
+                            isDarkMode={isDarkMode}
+                            isReadOnly={true}
+                            isDashedBorder={false}
+                            className="h-full"
+                            listeners={undefined}
+                            attributes={undefined}
+                          />
+                        </div>
+                      );
+                    })()
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             </div>
 
             {/* Etapas do Funil */}
@@ -703,7 +933,6 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                       isDashedBorder={true}
                       className="h-full"
                     />
-                    
                     {/* Connection arrows between steps */}
                     {index < otherSteps.length - 1 && (
                       <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
@@ -778,7 +1007,10 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
             step={null} // Passa null para criação, o modal se encarrega de preencher
             isOpen={showCreateStepModal}
             onClose={() => setShowCreateStepModal(false)}
-            onSave={handleCreateStep}
+            onSave={(stepData) => {
+              handleCreateStep(stepData);
+              setShowCreateStepModal(false);
+            }}
             isCreating={true}
             isTrafficOnly={isTrafficOnly}
             isDarkMode={isDarkMode}

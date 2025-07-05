@@ -58,10 +58,10 @@ export const stepTypes = {
     order: 3
   },
   crosssell: {
-    label: 'Cross-sell',
+    label: 'Down-sell',
     icon: TrendingDown,
     color: 'bg-green-100 text-green-600',
-    description: 'Ofertas complementares a produtos já adquiridos',
+    description: 'Oferta especial com desconto.',
     order: 3.5
   },
   subscription: {

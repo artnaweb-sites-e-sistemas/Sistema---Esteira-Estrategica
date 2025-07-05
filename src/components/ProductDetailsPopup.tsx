@@ -70,6 +70,16 @@ export const ProductDetailsPopup: React.FC<ProductDetailsPopupProps> = ({
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">{productTypeConfig?.label || product.type}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-300">{product.name}</p>
+                  {/* Tipo de Oferta */}
+                  {selectedProductItem.offerType && (
+                    <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                      selectedProductItem.offerType === 'inicial'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                    }`}>
+                      {selectedProductItem.offerType === 'inicial' ? 'Oferta Inicial' : 'Oferta de Upsell'}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -204,7 +214,7 @@ export const ProductDetailsPopup: React.FC<ProductDetailsPopupProps> = ({
   // Se não tiver item específico, mostra os detalhes do produto principal
   return ReactDOM.createPortal(
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
       onClick={handleBackdropClick}
     >
       <div 
@@ -224,7 +234,7 @@ export const ProductDetailsPopup: React.FC<ProductDetailsPopupProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={onEdit}
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
                 className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
                 title="Editar"
               >

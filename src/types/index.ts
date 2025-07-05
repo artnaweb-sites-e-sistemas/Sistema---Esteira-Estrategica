@@ -18,6 +18,8 @@ export interface Step {
   detailedDescription?: string;
   // Para etapas customizadas
   isCustom?: boolean;
+  // Valor do produto de down-sell (apenas para crosssell)
+  downsellValue?: number;
 }
 
 export interface ProductItem {
@@ -33,6 +35,7 @@ export interface ProductItem {
   notes?: string;
   value?: number;
   promessa?: string; // Campo para a promessa do produto
+  offerType?: 'inicial' | 'upsell'; // NOVO: tipo de oferta
 }
 
 export interface Module {

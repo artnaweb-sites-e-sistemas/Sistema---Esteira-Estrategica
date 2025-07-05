@@ -14,7 +14,9 @@ import {
   Lock,
   Plus,
   Megaphone,
-  Globe
+  Globe,
+  Grip,
+  CreditCard
 } from 'lucide-react';
 import { StepDetailsPopup } from './StepDetailsPopup';
 import { MetaAdsIcon } from '../icons/MetaAdsIcon';
@@ -29,6 +31,9 @@ interface StepNodeProps {
   isReadOnly?: boolean; // Nova prop para modo somente leitura
   isDashedBorder?: boolean; // Nova prop para controlar a borda listrada
   className?: string; // Permitir que a prop className seja passada
+  listeners?: any;
+  attributes?: any;
+  isDragging?: boolean;
 }
 
 const statusConfig = {
@@ -73,13 +78,16 @@ export const StepNode: React.FC<StepNodeProps> = ({
   isDarkMode, 
   isReadOnly = false,
   isDashedBorder = false,
-  className
+  className,
+  listeners,
+  attributes,
+  isDragging
 }) => {
   const [showDetailsPopup, setShowDetailsPopup] = useState(false);
 
   const config = statusConfig[step.status];
   const StatusIcon = config.icon;
-  const stepConfig = stepTypes[step.type];
+  const stepConfig = stepTypes[step.type] || stepTypes['custom'];
   const TypeIcon = stepConfig.icon;
 
   const isTrafficStep = step.type === 'traffic';
@@ -94,7 +102,7 @@ export const StepNode: React.FC<StepNodeProps> = ({
       })()
     : step.type === 'custom'
       ? Megaphone
-      : stepTypes[step.type]?.icon || Plus;
+      : (stepTypes[step.type] || stepTypes['custom']).icon || Plus;
 
   // Função para obter o ícone da estratégia de marketing
   const getStrategyIcon = (strategyId: string) => {
@@ -142,7 +150,12 @@ export const StepNode: React.FC<StepNodeProps> = ({
 
   return (
     <>
-      <div className={`bg-white dark:bg-gray-800 rounded-lg border ${isTrafficStep ? config.border : 'border-emerald-300 dark:border-emerald-600'} ${isDashedBorder ? 'border-dashed' : ''} p-4 shadow-sm hover:shadow-md transition-all group flex flex-col cursor-pointer h-full`}>
+      <div
+        className={`bg-white dark:bg-gray-800 rounded-lg border ${isTrafficStep ? config.border : 'border-emerald-300 dark:border-emerald-600'} ${isDashedBorder ? 'border-dashed' : ''} p-4 shadow-sm hover:shadow-md transition-all group flex flex-col cursor-pointer h-full ${listeners ? (isDragging ? 'cursor-grabbing' : 'cursor-pointer') : ''}`}
+        {...(listeners ? listeners : {})}
+        {...(attributes ? attributes : {})}
+        onClick={handleViewDetails}
+      >
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-2">
             <div className={`p-2 rounded-lg ${stepConfig.color}`}>
@@ -164,7 +177,6 @@ export const StepNode: React.FC<StepNodeProps> = ({
                 <Lock className="w-3 h-3" />
               </div>
             )}
-            
             <button
               onClick={handleViewDetails}
               className="p-1 text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
@@ -176,7 +188,7 @@ export const StepNode: React.FC<StepNodeProps> = ({
             {!isReadOnly && (
               <>
                 <button
-                  onClick={handleEdit}
+                  onClick={(e) => { e.stopPropagation(); handleEdit(); }}
                   className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
                   title="Editar"
                 >
@@ -196,7 +208,7 @@ export const StepNode: React.FC<StepNodeProps> = ({
 
         <div onClick={handleViewDetails} className="flex-grow flex flex-col h-full">
           <div className="flex-grow">
-            <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-2 leading-tight break-words">{step.name}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-2 leading-tight break-words">{step.name || stepTypes[step.type]?.label}</h3>
             <p className="text-gray-600 dark:text-gray-300 text-xs mb-3 leading-relaxed">{step.description}</p>
 
             {/* Mostrar produtos de upsell para checkout */}
@@ -217,7 +229,7 @@ export const StepNode: React.FC<StepNodeProps> = ({
             )}
 
             {/* Mostrar produtos relacionados para page, upsell, membership, subscription, mentoring, crosssell, capture */}
-            {['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step.type) && step.relatedProducts && step.relatedProducts.length > 0 && (
+            {['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture', 'custom'].includes(step.type) && step.relatedProducts && step.relatedProducts.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {step.type === 'page' ? 'Produtos:' :
@@ -225,7 +237,7 @@ export const StepNode: React.FC<StepNodeProps> = ({
                    step.type === 'membership' ? 'Produtos para Adquirir:' :
                    step.type === 'subscription' ? 'Produtos para Adquirir:' :
                    step.type === 'mentoring' ? 'Produtos para Adquirir:' :
-                   step.type === 'crosssell' ? 'Cross-sell:' :
+                   step.type === 'crosssell' ? 'Down-sell:' :
                    step.type === 'capture' ? 'Produtos da Página:' :
                    'Produtos para Adquirir:'}
                 </p>
@@ -253,6 +265,16 @@ export const StepNode: React.FC<StepNodeProps> = ({
                 <ExternalLink className="w-3 h-3" />
                 <span>Ver link</span>
               </a>
+            )}
+
+            {/* Exibir o valor do produto de down-sell no card, se existir */}
+            {step.type === 'crosssell' && typeof step.downsellValue === 'number' && !isNaN(step.downsellValue) && (
+              <div className="flex items-center space-x-2 mt-1">
+                <CreditCard className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(step.downsellValue)}
+                </span>
+              </div>
             )}
           </div>
 

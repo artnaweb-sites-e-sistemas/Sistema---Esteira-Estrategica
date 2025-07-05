@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { Step, StepType } from '../types';
 import { stepTypes, marketingStrategies } from '../data/stepTypes';
@@ -10,10 +10,25 @@ import {
   List, 
   Link as LinkIcon,
   Plus,
-  Trash2
+  Trash2,
+  CheckCircle2,
+  Clock,
+  Circle,
+  Package,
+  BookOpen,
+  Play,
+  Gift,
+  MessageCircle,
+  Send,
+  Users,
+  GripVertical
 } from 'lucide-react';
 import '../styles/modalStyles.css';
 import UnsavedChangesModal from './UnsavedChangesModal';
+import { CurrencyInput } from 'react-currency-mask';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface StepDetailsModalProps {
   step: Step | null;
@@ -25,6 +40,26 @@ interface StepDetailsModalProps {
   isDarkMode: boolean;
 }
 
+// Tipagem para produto relacionado
+interface RelatedProduct {
+  id: string;
+  name: string;
+}
+
+// Estado local: tipagem explícita para RelatedProduct[]
+interface StepFormData {
+  name: string;
+  description: string;
+  detailedDescription: string;
+  type: StepType;
+  link: string;
+  notes: string;
+  upsellProducts: string[];
+  relatedProducts: RelatedProduct[];
+  isCustom: boolean;
+  downsellValue?: number;
+}
+
 export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   step,
   isOpen,
@@ -34,7 +69,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   isTrafficOnly = false,
   isDarkMode
 }) => {
-  const [formData, setFormData] = useState({
+  const toProductObjArray = (arr: any): RelatedProduct[] => (arr && Array.isArray(arr) && typeof arr[0] === 'object')
+    ? arr as RelatedProduct[]
+    : (arr || ['']).map((name: string) => ({ id: crypto.randomUUID(), name }));
+
+  const [formData, setFormData] = useState<StepFormData>({
     name: step?.name || '',
     description: step?.description || '',
     detailedDescription: step?.detailedDescription || '',
@@ -42,10 +81,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     link: step?.link || '',
     notes: step?.notes || '',
     upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
-    relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step?.type || '') ? (step?.relatedProducts || ['']) : [],
-    isCustom: step?.isCustom || false
+    relatedProducts: toProductObjArray(step?.relatedProducts),
+    isCustom: step?.isCustom || false,
+    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
   });
-  const [initialData, setInitialData] = useState({
+  const [initialData, setInitialData] = useState<StepFormData>({
     name: step?.name || '',
     description: step?.description || '',
     detailedDescription: step?.detailedDescription || '',
@@ -53,17 +93,21 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     link: step?.link || '',
     notes: step?.notes || '',
     upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
-    relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step?.type || '') ? (step?.relatedProducts || ['']) : [],
-    isCustom: step?.isCustom || false
+    relatedProducts: toProductObjArray(step?.relatedProducts),
+    isCustom: step?.isCustom || false,
+    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
   });
   const [selectedStrategy, setSelectedStrategy] = useState(
     step?.type === 'traffic' ? (step?.notes || 'facebook-ads') : 'facebook-ads'
   );
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const downsellInputRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
     if (isCreating && isOpen) {
-      const data = {
+      const data: StepFormData = {
         name: '',
         description: '',
         detailedDescription: '',
@@ -71,14 +115,15 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         link: '',
         notes: '',
         upsellProducts: [''],
-        relatedProducts: [''],
-        isCustom: false
+        relatedProducts: [{ id: crypto.randomUUID(), name: '' }],
+        isCustom: false,
+        downsellValue: undefined
       };
       setFormData(data);
       setInitialData(data);
       setSelectedStrategy('facebook-ads');
     } else if (step && isOpen) {
-      const data = {
+      const data: StepFormData = {
         name: step.name || '',
         description: step.description || '',
         detailedDescription: step.detailedDescription || '',
@@ -86,8 +131,9 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         link: step.link || '',
         notes: step.notes || '',
         upsellProducts: step.type === 'checkout' ? (step.upsellProducts || ['']) : [],
-        relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(step.type) ? (step.relatedProducts || ['']) : [],
-        isCustom: step.isCustom || false
+        relatedProducts: toProductObjArray(step.relatedProducts),
+        isCustom: step.isCustom || false,
+        downsellValue: step.type === 'crosssell' && typeof step.downsellValue === 'number' ? step.downsellValue : undefined
       };
       setFormData(data);
       setInitialData(data);
@@ -101,55 +147,21 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     return JSON.stringify(formData) !== JSON.stringify(initialData);
   };
 
-  const handleSave = () => {
-    let saveData: Partial<Step>;
-    
-    if (formData.type === 'traffic') {
-      // Para estratégias de marketing
-      if (selectedStrategy === 'custom') {
-        saveData = {
-          ...formData,
-          name: formData.name || 'Estratégia Personalizada',
-          isCustom: true,
-          notes: selectedStrategy,
-          upsellProducts: [],
-          relatedProducts: []
-        };
+  const handleSave = (event?: React.FormEvent) => {
+    if (event) event.preventDefault();
+    const { downsellValue: formDownsellValue, relatedProducts, ...restFormData } = formData;
+    let dataToSave: Partial<Step> = { ...restFormData };
+    if (formData.type === 'crosssell') {
+      dataToSave.downsellValue = typeof formDownsellValue === 'number' && !isNaN(formDownsellValue) && formDownsellValue > 0 ? formDownsellValue : undefined;
+      if (formData.relatedProducts.length > 1) {
+        dataToSave.relatedProducts = [formData.relatedProducts[0].name];
       } else {
-        const strategy = marketingStrategies.find(s => s.id === selectedStrategy);
-        saveData = {
-          ...formData,
-          name: formData.name || strategy?.name || 'Estratégia de Marketing',
-          isCustom: false,
-          notes: selectedStrategy,
-          upsellProducts: [],
-          relatedProducts: []
-        };
+        dataToSave.relatedProducts = formData.relatedProducts.map((p: RelatedProduct) => p.name);
       }
     } else {
-      // Para outras etapas
-      if (formData.type === 'custom') {
-        saveData = {
-          ...formData,
-          name: formData.name || 'Etapa Personalizada',
-          isCustom: true,
-          upsellProducts: [],
-          relatedProducts: []
-        };
-      } else {
-        const stepConfig = stepTypes[formData.type];
-        saveData = {
-          ...formData,
-          name: formData.name || stepConfig.label,
-          isCustom: false,
-          upsellProducts: formData.type === 'checkout' ? formData.upsellProducts.filter(p => p.trim()) : [],
-          relatedProducts: ['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(formData.type) ? formData.relatedProducts.filter(p => p.trim()) : []
-        };
-      }
+      dataToSave.relatedProducts = formData.relatedProducts.map((p: RelatedProduct) => p.name);
     }
-    
-    onSave(saveData);
-    onClose();
+    onSave(dataToSave);
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -197,23 +209,24 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   };
 
   const addRelatedProduct = () => {
+    if (formData.type === 'crosssell' && formData.relatedProducts.length >= 1) return;
     setFormData(prev => ({
       ...prev,
-      relatedProducts: [...prev.relatedProducts, '']
+      relatedProducts: [...(prev.relatedProducts as RelatedProduct[]), { id: crypto.randomUUID(), name: '' }]
     }));
   };
 
   const removeRelatedProduct = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      relatedProducts: prev.relatedProducts.filter((_, i) => i !== index)
+      relatedProducts: (prev.relatedProducts as RelatedProduct[]).filter((_: RelatedProduct, i: number) => i !== index)
     }));
   };
 
   const updateRelatedProduct = (index: number, value: string) => {
     setFormData(prev => ({
       ...prev,
-      relatedProducts: prev.relatedProducts.map((product, i) => i === index ? value : product)
+      relatedProducts: (prev.relatedProducts as RelatedProduct[]).map((product: RelatedProduct, i: number) => i === index ? { ...product, name: value } : product)
     }));
   };
 
@@ -237,24 +250,25 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   };
 
   const getProductFieldLabel = () => {
-    switch (formData.type) {
-      case 'page':
-        return 'Produtos da Página';
-      case 'upsell':
-        return 'Produtos de Upsell';
-      case 'membership':
-        return 'Produtos para Adquirir';
-      case 'subscription':
-        return 'Produtos para Adquirir';
-      case 'mentoring':
-        return 'Produtos para Adquirir';
-      case 'crosssell':
-        return 'Produtos de cross-sell';
-      case 'capture':
-        return 'Produtos da Página de Captura';
-      default:
-        return 'Produtos Relacionados';
-    }
+    if (formData.type === 'crosssell') return 'Produto de Down-sell';
+    if (formData.type === 'custom') return 'Produtos da Etapa';
+    return formData.type === 'page' ? 'Produtos da Página' : 'Produtos para Adquirir';
+  };
+
+  const getProductItemId = (product: RelatedProduct) => product.id;
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setFormData(prev => {
+      const oldIndex = (prev.relatedProducts as RelatedProduct[]).findIndex((product: RelatedProduct) => getProductItemId(product) === active.id);
+      const newIndex = (prev.relatedProducts as RelatedProduct[]).findIndex((product: RelatedProduct) => getProductItemId(product) === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return {
+        ...prev,
+        relatedProducts: arrayMove(prev.relatedProducts as RelatedProduct[], oldIndex, newIndex)
+      };
+    });
   };
 
   if (!isOpen) return null;
@@ -264,9 +278,10 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       onClick={handleBackdropClick}
     >
-      <div 
+      <form 
         className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl custom-scrollbar"
         onClick={e => e.stopPropagation()}
+        onSubmit={handleSave}
       >
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 rounded-t-xl">
           <div className="flex items-center justify-between">
@@ -277,6 +292,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
               }
             </h2>
             <button
+              type="button"
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
             >
@@ -406,39 +422,76 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
           )}
 
           {/* Produtos Relacionados */}
-          {['page', 'upsell', 'membership', 'subscription', 'mentoring', 'crosssell', 'capture'].includes(formData.type) && (
+          {['page', 'upsell', 'membership', 'subscription', 'mentoring', 'custom', 'capture', 'crosssell'].includes(formData.type) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {getProductFieldLabel()}
+                {formData.type === 'crosssell' ? 'Produto de Down-sell' : getProductFieldLabel()}
               </label>
-              <div className="space-y-3">
-                {formData.relatedProducts.map((product, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={product}
-                      onChange={(e) => updateRelatedProduct(index, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="Nome do Produto"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeRelatedProduct(index)}
-                      className="p-2 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={(formData.relatedProducts as RelatedProduct[]).map(getProductItemId)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-3">
+                    {(formData.relatedProducts as RelatedProduct[]).map((product: RelatedProduct, index: number) => {
+                      const itemId = getProductItemId(product);
+                      if (formData.type === 'crosssell') {
+                        return (
+                          <div key={itemId} className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={product.name}
+                              onChange={(e) => updateRelatedProduct(index, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              placeholder="Nome do Produto"
+                              disabled={index > 0}
+                            />
+                          </div>
+                        );
+                      }
+                      return (
+                        <SortableProductInput
+                          key={itemId}
+                          id={itemId}
+                          index={index}
+                          value={product.name}
+                          onChange={updateRelatedProduct}
+                          onRemove={removeRelatedProduct}
+                          canRemove={(formData.relatedProducts as RelatedProduct[]).length > 1}
+                        />
+                      );
+                    })}
+                    {formData.type !== 'crosssell' && (
+                      <button
+                        type="button"
+                        onClick={addRelatedProduct}
+                        className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Adicionar Produto</span>
+                      </button>
+                    )}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addRelatedProduct}
-                  className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Adicionar Produto</span>
-                </button>
-              </div>
+                </SortableContext>
+              </DndContext>
+              {/* Campo de valor para down-sell */}
+              {formData.type === 'crosssell' && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor do Produto de Down-sell (R$)</label>
+                  <CurrencyInput
+                    value={formData.downsellValue}
+                    onChangeValue={(_, originalValue) => setFormData(prev => ({ ...prev, downsellValue: originalValue === '' ? undefined : Number(originalValue) }))}
+                    currency="BRL"
+                    locale="pt-BR"
+                    hideSymbol={false}
+                    InputElement={
+                      <input
+                        ref={downsellInputRef}
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="R$ 0,00"
+                      />
+                    }
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -541,22 +594,14 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-6 rounded-b-xl">
           <div className="flex justify-end space-x-3">
             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
+              type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               {isCreating ? 'Criar' : 'Salvar Alterações'}
             </button>
           </div>
         </div>
-      </div>
+      </form>
       <UnsavedChangesModal
         isOpen={showUnsavedModal}
         onSave={handleSaveFromModal}
@@ -568,3 +613,40 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     document.body
   );
 };
+
+// No SortableProductInput, borda transparente por padrão, azul só ao arrastar
+function SortableProductInput({ id, index, value, onChange, onRemove, canRemove }: any) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition: transition || undefined,
+        zIndex: isDragging ? 50 : 'auto',
+      }}
+      className={`flex items-center space-x-2 bg-white dark:bg-gray-800 rounded-lg`}
+    >
+      <button type="button" {...listeners} {...attributes} className="p-2 cursor-grab text-gray-400 hover:text-blue-600 focus:outline-none">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(index, e.target.value)}
+        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${isDragging ? 'border-blue-500' : 'border-gray-300 dark:border-gray-600'}`}
+        placeholder="Nome do Produto"
+        style={isDragging ? { boxShadow: '0 2px 8px 0 rgba(59,130,246,0.15)' } : {}}
+      />
+      {canRemove && (
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="p-2 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
