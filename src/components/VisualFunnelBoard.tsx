@@ -132,7 +132,7 @@ export const VisualFunnelBoard: React.FC<VisualFunnelBoardProps> = ({
             </div>
           </div>
 
-          <div className="w-full md:w-full lg:w-full mt-10 lg:ml-5 lg:mr-auto lg:pr-12">
+          {/* <div className="w-full md:w-full lg:w-full mt-10 lg:ml-5 lg:mr-auto lg:pr-12">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <AudienceTargeting
@@ -151,7 +151,7 @@ export const VisualFunnelBoard: React.FC<VisualFunnelBoardProps> = ({
                 />
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="relative mt-10">
             <div className="space-y-4">
