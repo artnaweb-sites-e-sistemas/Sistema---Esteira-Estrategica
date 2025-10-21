@@ -217,7 +217,9 @@ export const StepNode: React.FC<StepNodeProps> = ({
             <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-2 leading-tight break-words">
               {['capture', 'page'].includes(step.type) 
                 ? stepTypes[step.type]?.label 
-                : (step.name || stepTypes[step.type]?.label)
+                : step.type === 'traffic' && step.notes
+                  ? getStrategyName(step.notes)
+                  : (step.name || stepTypes[step.type]?.label)
               }
             </h3>
             <p className="text-gray-600 dark:text-gray-300 text-xs mb-3 leading-relaxed">{step.description}</p>

@@ -1022,6 +1022,28 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
 
               {/* Accordion de Etapas Hierárquicas */}
               <div className="space-y-3">
+                {/* Card para adicionar primeira etapa quando não há nenhuma */}
+                {parentSteps.length === 0 && orphanSteps.length === 0 && orphanParentPages.length === 0 && !isReadOnly && (
+                  <div 
+                    onClick={() => {
+                      setIsTrafficOnly(false);
+                      setPendingParentId(null);
+                      setShowCreateStepModal(true);
+                    }}
+                    className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group"
+                  >
+                    <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-green-200 dark:group-hover:bg-green-800 rounded-full p-4 mb-3 transition-colors">
+                      <Plus className="w-8 h-8 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400" />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 font-medium text-base text-center">
+                      Adicionar Etapa
+                    </p>
+                    <p className="text-gray-400 dark:text-gray-500 text-xs text-center mt-1">
+                      Clique para criar sua primeira etapa do funil
+                    </p>
+                  </div>
+                )}
+
                 {parentSteps.map((parentStep, parentIndex) => {
                   const children = getChildrenOfParent(parentStep.id);
                   const isExpanded = expandedParentId === parentStep.id;
@@ -1372,19 +1394,17 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                           setIsTrafficOnly(true);
                           setShowCreateStepModal(true);
                         }}
-                        className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group h-full"
+                        className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group h-full"
                       >
-                        <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 rounded-full p-3 mb-3 transition-colors">
-                          <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                        <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 rounded-full p-4 mb-3 transition-colors">
+                          <Plus className="w-8 h-8 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                         </div>
-                        <p className="text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium text-sm">
+                        <p className="text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 font-medium text-base text-center">
                           Adicionar Estratégia
                         </p>
-                      </div>
-                    )}
-                    {trafficSteps.length === 0 && (
-                      <div className="col-span-full text-center py-4">
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhuma estratégia cadastrada</p>
+                        <p className="text-gray-400 dark:text-gray-500 text-xs text-center mt-1">
+                          Clique para adicionar uma estratégia de marketing
+                        </p>
                       </div>
                     )}
                   </div>

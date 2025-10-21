@@ -38,6 +38,57 @@ const sanitizeObjectForFirestore = (obj: any): any => {
   return newObj;
 };
 
+// Helper function to clean orphan parentId references
+const cleanOrphanReferences = async (funnels: Funnel[]): Promise<Funnel[]> => {
+  let hasChanges = false;
+  
+  const cleanedFunnels = funnels.map(funnel => {
+    const cleanedProducts = funnel.products.map(product => {
+      // Criar um Set de IDs de todas as etapas existentes
+      const existingStepIds = new Set(product.steps.map(s => s.id));
+      
+      // Limpar parentId de etapas que apontam para pais inexistentes
+      const cleanedSteps = product.steps.map(step => {
+        if (step.parentId && !existingStepIds.has(step.parentId)) {
+          console.log(`🧹 Limpando parentId órfão: etapa ${step.id} apontava para ${step.parentId} que não existe mais`);
+          hasChanges = true;
+          const { parentId, ...stepWithoutParent } = step;
+          return stepWithoutParent;
+        }
+        return step;
+      });
+      
+      return { ...product, steps: cleanedSteps };
+    });
+    
+    return { ...funnel, products: cleanedProducts };
+  });
+  
+  // Se houve mudanças, salvar no Firestore
+  if (hasChanges) {
+    console.log('🧹 Referências órfãs detectadas! Salvando funis limpos no Firestore...');
+    
+    for (const funnel of cleanedFunnels) {
+      try {
+        const funnelRef = doc(db, 'funnels', funnel.id);
+        const dataToUpdate = sanitizeObjectForFirestore({
+          ...funnel,
+          updatedAt: serverTimestamp()
+        });
+        delete dataToUpdate.id;
+        await updateDoc(funnelRef, dataToUpdate);
+        console.log(`✅ Funil ${funnel.name} limpo e salvo no Firestore`);
+      } catch (error) {
+        console.error(`❌ Erro ao salvar funil limpo ${funnel.name}:`, error);
+      }
+    }
+  } else {
+    console.log('✅ Nenhuma referência órfã encontrada');
+  }
+  
+  return cleanedFunnels;
+};
+
 export const useFunnels = () => {
   const { user } = useAuth();
   const [funnels, setFunnels] = useState<Funnel[]>([]);
@@ -93,7 +144,10 @@ export const useFunnels = () => {
       });
       
       console.log('✅ Funis carregados do Firestore:', loadedFunnels.length);
-      setFunnels(loadedFunnels);
+      
+      // 🧹 Limpar referências órfãs de parentId
+      const cleanedFunnels = await cleanOrphanReferences(loadedFunnels);
+      setFunnels(cleanedFunnels);
       
       if (loadedFunnels.length > 0 && !activeFunnelId) {
         setActiveFunnelId(loadedFunnels[0].id);

@@ -183,6 +183,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
       delete dataToSave.parentId;
     }
     
+    // Para estratégias de marketing, salvar o selectedStrategy no campo notes
+    if (isTrafficOnly && formData.type === 'traffic') {
+      dataToSave.notes = selectedStrategy;
+    }
+    
     if (formData.type === 'crosssell') {
       dataToSave.downsellValue = typeof formDownsellValue === 'number' && !isNaN(formDownsellValue) && formDownsellValue > 0 ? formDownsellValue : undefined;
       if (formData.relatedProducts.length > 1) {
@@ -335,12 +340,36 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
       >
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 rounded-t-xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {isCreating 
-                ? (isTrafficOnly ? 'Criar Nova Estratégia' : 'Criar Nova Etapa')
-                : (isTrafficOnly ? 'Editar Estratégia' : 'Editar Etapa')
-              }
-            </h2>
+            <div className="flex items-center space-x-3">
+              {isTrafficOnly && (() => {
+                const currentStrategy = marketingStrategies.find(s => s.id === selectedStrategy);
+                if (currentStrategy) {
+                  const StrategyIcon = currentStrategy.icon;
+                  return (
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <StrategyIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {isCreating 
+                  ? (isTrafficOnly 
+                      ? (() => {
+                          const currentStrategy = marketingStrategies.find(s => s.id === selectedStrategy);
+                          return currentStrategy ? currentStrategy.name : 'Criar Nova Estratégia';
+                        })()
+                      : 'Criar Nova Etapa')
+                  : (isTrafficOnly 
+                      ? (() => {
+                          const currentStrategy = marketingStrategies.find(s => s.id === selectedStrategy);
+                          return currentStrategy ? currentStrategy.name : 'Editar Estratégia';
+                        })()
+                      : 'Editar Etapa')
+                }
+              </h2>
+            </div>
             <button
               type="button"
               onClick={onClose}
@@ -369,7 +398,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
                       type="button"
                       onClick={() => {
                         setSelectedStrategy(strategy.id);
-                        setFormData(prev => ({ ...prev, type: 'traffic' }));
+                        setFormData(prev => ({ ...prev, type: 'traffic', notes: strategy.id }));
                       }}
                       className={`p-3 rounded-lg border-2 transition-all text-left ${
                         selectedStrategy === strategy.id
