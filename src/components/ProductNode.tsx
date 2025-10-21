@@ -5,7 +5,7 @@ import { StepDetailsModal } from './StepDetailsModal';
 import { ProductDetailsModal } from './ProductDetailsModal';
 import { ProductDetailsPopup } from './ProductDetailsPopup';
 import { ProductItemModal } from './ProductItemModal';
-import { stepTypes, marketingStrategies } from '../data/stepTypes';
+import { stepTypes, marketingStrategies, isParentCategory } from '../data/stepTypes';
 import { productBlockTypes } from '../data/productBlockTypes';
 import { 
   CheckCircle2, 
@@ -13,6 +13,7 @@ import {
   Circle, 
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Package,
   Plus,
   Edit3,
@@ -336,6 +337,7 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCreateStepModal, setShowCreateStepModal] = useState(false);
   const [isTrafficOnly, setIsTrafficOnly] = useState(false);
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null);
   const [showProductDetailsPopup, setShowProductDetailsPopup] = useState(false);
   const [showProductEditModal, setShowProductEditModal] = useState(false);
   const [showProductItemModal, setShowProductItemModal] = useState(false);
@@ -347,6 +349,33 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
   const [activeProductItemId, setActiveProductItemId] = useState<string | null>(null);
   const [activeTrafficStepId, setActiveTrafficStepId] = useState<string | null>(null);
+
+  // Estado para controlar qual etapa pai está expandida (apenas uma por vez)
+  const [expandedParentId, setExpandedParentId] = useState<string | null>(() => {
+    const parentSteps = product.steps.filter(s => isParentCategory(s.type) && !s.parentId);
+    return parentSteps.length > 0 ? parentSteps[0].id : null;
+  });
+
+  // Garantir que sempre haja um pai expandido se houver pais
+  React.useEffect(() => {
+    const parentSteps = product.steps.filter(s => isParentCategory(s.type) && !s.parentId);
+    if (parentSteps.length > 0 && !expandedParentId) {
+      setExpandedParentId(parentSteps[0].id);
+    }
+  }, [product.steps, expandedParentId]);
+
+  // Estado para modal de exclusão em cascata
+  const [cascadeDeleteModal, setCascadeDeleteModal] = useState<{
+    isOpen: boolean;
+    stepId: string | null;
+    stepName: string;
+    childrenCount: number;
+  }>({
+    isOpen: false,
+    stepId: null,
+    stepName: '',
+    childrenCount: 0
+  });
   
   const config = statusConfig[product.status];
   const StatusIcon = config.icon;
@@ -421,8 +450,15 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
       upsellProducts: stepData.upsellProducts,
       relatedProducts: stepData.relatedProducts,
       isCustom: stepData.isCustom,
+      ...(stepData.parentId ? { parentId: stepData.parentId } : {}),
       ...(typeof stepData.downsellValue !== 'undefined' ? { downsellValue: stepData.downsellValue } : {})
     };
+    
+    // Se a etapa tem um pai, expande automaticamente esse pai
+    if (stepData.parentId) {
+      setExpandedParentId(stepData.parentId);
+    }
+    
     onAddStep(newStep);
   };
 
@@ -545,8 +581,158 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
     setShowDeleteProductConfirm(false);
   };
 
+  // Função para expandir/colapsar etapa pai (apenas uma por vez)
+  const toggleParentExpansion = (parentId: string) => {
+    if (expandedParentId === parentId) {
+      // Se clicar no já expandido, não faz nada (mantém expandido)
+      return;
+    }
+    setExpandedParentId(parentId);
+  };
+
+  // Função para deletar etapa com verificação de cascata
+  const handleDeleteStepWithValidation = (stepId: string) => {
+    const step = product.steps.find(s => s.id === stepId);
+    if (!step) return;
+
+    // Fechar modal de edição se estiver aberto
+    if (showEditStepModal) {
+      setShowEditStepModal(false);
+      setSelectedStep(null);
+      
+      // Aguardar um momento para garantir que o modal de edição feche antes de abrir o de exclusão
+      setTimeout(() => {
+        proceedWithDelete(stepId, step);
+      }, 100);
+      return;
+    }
+
+    proceedWithDelete(stepId, step);
+  };
+
+  // Função auxiliar para processar a exclusão
+  const proceedWithDelete = (stepId: string, step: Step) => {
+    // Verificar se é uma etapa pai
+    if (isParentCategory(step.type)) {
+      const children = product.steps.filter(s => s.parentId === stepId);
+      
+      if (children.length > 0) {
+        // Verificar se há uma página pai vinculada (que pode "herdar" os filhos)
+        const linkedParentPage = children.find(s => isParentCategory(s.type));
+        
+        if (linkedParentPage) {
+          // Há uma página pai vinculada - transferir os filhos normais para ela
+          const normalChildren = children.filter(s => !isParentCategory(s.type));
+          
+          // Transferir os filhos normais para a página pai vinculada
+          normalChildren.forEach(child => {
+            onUpdateStep(child.id, { parentId: linkedParentPage.id });
+          });
+          
+          // Remover o vínculo da página pai vinculada (ela fica independente)
+          onUpdateStep(linkedParentPage.id, { parentId: undefined });
+          
+          // Deletar apenas a página atual
+          onDeleteStep(stepId);
+          return;
+        }
+        
+        // Não há página pai vinculada - mostrar modal de exclusão em cascata
+        setCascadeDeleteModal({
+          isOpen: true,
+          stepId: stepId,
+          stepName: step.name || stepTypes[step.type]?.label || step.type,
+          childrenCount: children.length
+        });
+        return;
+      }
+    }
+
+    // Se não tem filhos ou não é pai, deletar normalmente
+    onDeleteStep(stepId);
+  };
+
+  // Função para confirmar exclusão em cascata
+  const handleConfirmCascadeDelete = () => {
+    if (!cascadeDeleteModal.stepId) return;
+
+    const stepId = cascadeDeleteModal.stepId;
+    const children = product.steps.filter(s => s.parentId === stepId);
+
+    // Deletar todas as etapas filhas
+    children.forEach(child => {
+      onDeleteStep(child.id);
+    });
+
+    // Deletar a etapa pai
+    onDeleteStep(stepId);
+
+    // Fechar modal
+    setCascadeDeleteModal({
+      isOpen: false,
+      stepId: null,
+      stepName: '',
+      childrenCount: 0
+    });
+  };
+
   // Separar etapas de tráfego das outras
   const trafficSteps = product.steps.filter(step => step.type === 'traffic');
+  
+  // Organizar etapas em hierarquia
+  // Excluir páginas pai que têm um parentId (pois serão renderizadas dentro do pai delas)
+  // E filtrar apenas páginas pai que têm produtos (páginas vazias são consideradas "órfãs")
+  const parentSteps = product.steps
+    .filter(step => 
+      isParentCategory(step.type) && 
+      !step.parentId &&
+      step.relatedProducts && 
+      step.relatedProducts.length > 0
+    )
+    .sort((a, b) => {
+      const aOrder = stepTypes[a.type]?.order || 999;
+      const bOrder = stepTypes[b.type]?.order || 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.order - b.order;
+    });
+  
+  // Páginas pai órfãs (sem produtos vinculados)
+  const orphanParentPages = product.steps.filter(step => 
+    isParentCategory(step.type) && 
+    !step.parentId &&
+    (!step.relatedProducts || step.relatedProducts.length === 0)
+  );
+
+  // Criar mapa de filhos para cada pai
+  const getChildrenOfParent = (parentId: string): Step[] => {
+    return product.steps
+      .filter(step => 
+        step.parentId === parentId && 
+        !isParentCategory(step.type) // Excluir páginas pai vinculadas (já renderizadas separadamente)
+      )
+      .sort((a, b) => {
+        const aOrder = stepTypes[a.type]?.order || 999;
+        const bOrder = stepTypes[b.type]?.order || 999;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.order - b.order;
+      });
+  };
+
+  // Encontrar etapas órfãs (filhas sem pai definido)
+  const orphanSteps = product.steps
+    .filter(step => 
+      step.type !== 'traffic' && 
+      !isParentCategory(step.type) && 
+      !step.parentId
+    )
+    .sort((a, b) => {
+      const aOrder = stepTypes[a.type]?.order || 999;
+      const bOrder = stepTypes[b.type]?.order || 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.order - b.order;
+    });
+
+  // Manter compatibilidade com código antigo
   const otherSteps = product.steps
     .filter(step => step.type !== 'traffic')
     .sort((a, b) => {
@@ -812,7 +998,7 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
               </div>
             </div>
 
-            {/* Etapas do Funil */}
+            {/* Etapas do Funil - Accordion Hierárquico */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center flex-1">
@@ -823,6 +1009,7 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                   <button
                     onClick={() => {
                       setIsTrafficOnly(false);
+                      setPendingParentId(null); // Limpar o pendingParentId para criar etapa independente
                       setShowCreateStepModal(true);
                     }}
                     className="ml-4 flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
@@ -832,52 +1019,297 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
-                {otherSteps.map((step, index) => (
-                  <div key={step.id} className="relative h-full">
-                    <StepNode
-                      step={step}
-                      onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(step.id, updates)}
-                      onDelete={isReadOnly ? () => {} : () => onDeleteStep(step.id)}
-                      onEdit={() => handleStepEdit(step)}
-                      isDarkMode={isDarkMode}
-                      isReadOnly={isReadOnly}
-                      isDashedBorder={true}
-                      className="h-full"
-                    />
-                    {/* Connection arrows between steps */}
-                    {index < otherSteps.length - 1 && (
-                      <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
-                        {/* Line */}
-                        <div className="w-4 h-[2px] bg-teal-500"></div>
-                        {/* Arrow circle */}
-                        <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
-                          <div className="shimmer-bg absolute inset-0"></div>
-                          <ChevronsRight size={16} className="text-white" />
+
+              {/* Accordion de Etapas Hierárquicas */}
+              <div className="space-y-3">
+                {parentSteps.map((parentStep, parentIndex) => {
+                  const children = getChildrenOfParent(parentStep.id);
+                  const isExpanded = expandedParentId === parentStep.id;
+                  
+                  // Verificar se há uma página pai vinculada (Página de Captura para Página de Vendas, ou vice-versa)
+                  const linkedParentPage = product.steps.find(s => 
+                    isParentCategory(s.type) && s.parentId === parentStep.id
+                  );
+                  
+                  return (
+                    <div key={parentStep.id} className="space-y-2">
+                      {/* Etapa Pai - Compactada quando não expandida */}
+                      {isExpanded ? (
+                        // PAI EXPANDIDO - Grid completo com filhos
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {/* Página de Captura sempre vem ANTES */}
+                          {(() => {
+                            // Se parentStep é page (vendas) E linkedParentPage é captura, inverte a ordem
+                            // Caso contrário, mantém ordem original (parentStep → linkedParentPage)
+                            const shouldInvert = parentStep.type === 'page' && linkedParentPage?.type === 'capture';
+                            
+                            const firstPage = shouldInvert ? linkedParentPage : parentStep;
+                            const secondPage = shouldInvert ? parentStep : linkedParentPage;
+                            
+                            return (
+                              <>
+                                {/* Primeira Página */}
+                                <div className="relative">
+                                  <StepNode
+                                    step={firstPage}
+                                    onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(firstPage.id, updates)}
+                                    onDelete={isReadOnly ? () => {} : () => handleDeleteStepWithValidation(firstPage.id)}
+                                    onEdit={() => handleStepEdit(firstPage)}
+                                    isDarkMode={isDarkMode}
+                                    isReadOnly={isReadOnly}
+                                    isDashedBorder={true}
+                                    className="h-full"
+                                  />
+
+                                  {/* Seta para segunda página ou primeiro filho */}
+                                  {(secondPage || children.length > 0) && (
+                                    <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
+                                      <div className="w-4 h-[2px] bg-teal-500"></div>
+                                      <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
+                                        <div className="shimmer-bg absolute inset-0"></div>
+                                        <ChevronsRight size={16} className="text-white" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Segunda Página (se existir) */}
+                                {secondPage && (
+                                  <div className="relative">
+                                    <StepNode
+                                      step={secondPage}
+                                      onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(secondPage.id, updates)}
+                                      onDelete={isReadOnly ? () => {} : () => handleDeleteStepWithValidation(secondPage.id)}
+                                      onEdit={() => handleStepEdit(secondPage)}
+                                      isDarkMode={isDarkMode}
+                                      isReadOnly={isReadOnly}
+                                      isDashedBorder={true}
+                                      className="h-full"
+                                    />
+
+                                    {/* Seta para primeiro filho */}
+                                    {children.length > 0 && (
+                                      <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
+                                        <div className="w-4 h-[2px] bg-teal-500"></div>
+                                        <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
+                                          <div className="shimmer-bg absolute inset-0"></div>
+                                          <ChevronsRight size={16} className="text-white" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+
+                          {/* Etapas Filhas - Lado a lado */}
+                          {children.map((childStep, childIndex) => (
+                            <div key={childStep.id} className="relative">
+                              <StepNode
+                                step={childStep}
+                                onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(childStep.id, updates)}
+                                onDelete={isReadOnly ? () => {} : () => handleDeleteStepWithValidation(childStep.id)}
+                                onEdit={() => handleStepEdit(childStep)}
+                                isDarkMode={isDarkMode}
+                                isReadOnly={isReadOnly}
+                                isDashedBorder={true}
+                                className="h-full"
+                              />
+
+                              {/* Seta entre etapas filhas */}
+                              {childIndex < children.length - 1 && (
+                                <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
+                                  <div className="w-4 h-[2px] bg-teal-500"></div>
+                                  <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
+                                    <div className="shimmer-bg absolute inset-0"></div>
+                                    <ChevronsRight size={16} className="text-white" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Card para adicionar nova etapa - dentro do grid expandido */}
+                          {!isReadOnly && (
+                            <div 
+                              onClick={() => {
+                                setIsTrafficOnly(false);
+                                // Preferir Página de Vendas se existir, caso contrário usar Página de Captura
+                                const preferredParentId = (() => {
+                                  // Se parentStep é page (vendas), usar ela
+                                  if (parentStep.type === 'page') return parentStep.id;
+                                  // Se linkedParentPage é page (vendas), usar ela
+                                  if (linkedParentPage?.type === 'page') return linkedParentPage.id;
+                                  // Caso contrário, usar parentStep (que será captura)
+                                  return parentStep.id;
+                                })();
+                                setPendingParentId(preferredParentId);
+                                setShowCreateStepModal(true);
+                              }}
+                              className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group h-full"
+                            >
+                              <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-green-200 dark:group-hover:bg-green-800 rounded-full p-3 mb-2 transition-colors">
+                                <Plus className="w-6 h-6 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400" />
+                              </div>
+                              <p className="text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 font-medium text-sm text-center">
+                                Adicionar Etapa
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                
-                {/* Card vazio para adicionar etapa personalizada - apenas se não for somente leitura */}
-                {!isReadOnly && (
-                  <div 
-                    onClick={() => {
-                      setIsTrafficOnly(false);
-                      setShowCreateStepModal(true);
-                    }}
-                    className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group h-full"
-                  >
-                    <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-green-200 dark:group-hover:bg-green-800 rounded-full p-3 mb-3 transition-colors">
-                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400" />
+                      ) : (
+                        // PAI COMPACTADO - Versão mini
+                        <div
+                          onClick={() => toggleParentExpansion(parentStep.id)}
+                          className={`cursor-pointer transition-all duration-300 ${
+                            isDarkMode
+                              ? 'bg-gray-800 hover:bg-gray-750 border-gray-700'
+                              : 'bg-gray-50 hover:bg-gray-100 border-gray-300'
+                          } border-2 border-dashed rounded-lg p-3 flex items-center justify-between`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <ChevronRight className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                            <div className="flex items-center space-x-2">
+                              {React.createElement(stepTypes[parentStep.type]?.icon || Globe, {
+                                className: 'w-5 h-5 text-green-600 dark:text-green-400'
+                              })}
+                              <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                {(() => {
+                                  // Para páginas pai, mostra: "Tipo - Nome do Produto"
+                                  const typeLabel = stepTypes[parentStep.type]?.label;
+                                  let productName = '';
+                                  
+                                  if (parentStep.relatedProducts && parentStep.relatedProducts.length > 0) {
+                                    const firstProduct = parentStep.relatedProducts[0];
+                                    if (typeof firstProduct === 'string') {
+                                      productName = firstProduct;
+                                    } else if (firstProduct && typeof firstProduct === 'object' && 'name' in firstProduct) {
+                                      productName = firstProduct.name;
+                                    }
+                                  }
+                                  
+                                  return productName ? `${typeLabel} - ${productName}` : typeLabel;
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Clique para expandir
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 font-medium text-sm">
-                      Adicionar Etapa
-                    </p>
-                    <p className="text-gray-400 dark:text-gray-500 group-hover:text-green-500 dark:group-hover:text-green-500 text-xs text-center mt-1">
-                      Clique para criar uma nova etapa do funil
-                    </p>
+                  );
+                })}
+
+                {/* Páginas Vazias (sem produtos) */}
+                {orphanParentPages.length > 0 && (
+                  <div className="mb-4">
+                    <div className={`border-2 border-dashed rounded-lg p-4 ${
+                      isDarkMode 
+                        ? 'bg-red-900/20 border-red-700' 
+                        : 'bg-red-50 border-red-300'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <h4 className={`font-semibold text-sm ${isDarkMode ? 'text-red-300' : 'text-red-800'}`}>
+                            Páginas Vazias - Sem Produtos ({orphanParentPages.length})
+                          </h4>
+                        </div>
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => {
+                              // Deletar todas as páginas vazias
+                              orphanParentPages.forEach(page => {
+                                onDeleteStep(page.id);
+                              });
+                            }}
+                            className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                              isDarkMode 
+                                ? 'bg-red-700 hover:bg-red-600 text-white' 
+                                : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                          >
+                            Limpar Todas
+                          </button>
+                        )}
+                      </div>
+                      <p className={`text-xs mb-3 ${isDarkMode ? 'text-red-400' : 'text-red-700'}`}>
+                        Estas páginas não têm produtos vinculados e não aparecem nos dropdowns. Delete-as para limpar seu funil.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {orphanParentPages.map((orphanPage) => (
+                          <div key={orphanPage.id} className="relative">
+                            <StepNode
+                              step={orphanPage}
+                              onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(orphanPage.id, updates)}
+                              onDelete={isReadOnly ? () => {} : () => onDeleteStep(orphanPage.id)}
+                              onEdit={() => handleStepEdit(orphanPage)}
+                              isDarkMode={isDarkMode}
+                              isReadOnly={isReadOnly}
+                              isDashedBorder={true}
+                              className="h-full"
+                            />
+                            
+                            {/* Badge de aviso */}
+                            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10">
+                              ✕
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Etapas Órfãs - Sem pai definido */}
+                {orphanSteps.length > 0 && (
+                  <div>
+                    <div className={`border-2 border-dashed rounded-lg p-4 ${
+                      isDarkMode 
+                        ? 'bg-yellow-900/20 border-yellow-700' 
+                        : 'bg-yellow-50 border-yellow-300'
+                    }`}>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <h4 className={`font-semibold text-sm ${isDarkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                          Etapas sem Pai Definido ({orphanSteps.length})
+                        </h4>
+                      </div>
+                      <p className={`text-xs mb-3 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                        Estas etapas precisam ser vinculadas a uma Página de Captura ou Página de Vendas. Clique no ícone de editar para configurar.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {orphanSteps.map((orphanStep) => (
+                          <div key={orphanStep.id} className="relative">
+                            <StepNode
+                              step={orphanStep}
+                              onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(orphanStep.id, updates)}
+                              onDelete={isReadOnly ? () => {} : () => handleDeleteStepWithValidation(orphanStep.id)}
+                              onEdit={() => handleStepEdit(orphanStep)}
+                              isDarkMode={isDarkMode}
+                              isReadOnly={isReadOnly}
+                              isDashedBorder={true}
+                              className="h-full"
+                            />
+                            
+                            {/* Badge de aviso */}
+                            <div className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10">
+                              !
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1019,14 +1451,29 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
           <StepDetailsModal
             step={null} // Passa null para criação, o modal se encarrega de preencher
             isOpen={showCreateStepModal}
-            onClose={() => setShowCreateStepModal(false)}
+            onClose={() => {
+              setShowCreateStepModal(false);
+              setPendingParentId(null); // Limpar o pendingParentId ao fechar
+            }}
             onSave={(stepData) => {
               handleCreateStep(stepData);
               setShowCreateStepModal(false);
+              setPendingParentId(null); // Limpar o pendingParentId após salvar
             }}
             isCreating={true}
             isTrafficOnly={isTrafficOnly}
             isDarkMode={isDarkMode}
+            availableParentSteps={(() => {
+              // Filtrar apenas páginas pai que têm produtos vinculados
+              const parents = product.steps.filter(s => 
+                isParentCategory(s.type) && 
+                s.relatedProducts && 
+                s.relatedProducts.length > 0
+              );
+              console.log('🔍 Etapas pai disponíveis (com produtos):', parents.map(p => ({ id: p.id, type: p.type, name: p.name, products: p.relatedProducts })));
+              return parents;
+            })()}
+            initialParentId={pendingParentId}
           />
         )}
 
@@ -1048,6 +1495,17 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
             isCreating={false}
             isTrafficOnly={selectedStep.type === 'traffic'}
             isDarkMode={isDarkMode}
+            availableParentSteps={(() => {
+              // Filtrar apenas páginas pai que têm produtos vinculados (exceto a própria etapa sendo editada)
+              const parents = product.steps.filter(s => 
+                isParentCategory(s.type) && 
+                s.id !== selectedStep.id &&
+                s.relatedProducts && 
+                s.relatedProducts.length > 0
+              );
+              console.log('🔍 Etapas pai disponíveis para edição (com produtos):', parents.map(p => ({ id: p.id, type: p.type, name: p.name, products: p.relatedProducts })));
+              return parents;
+            })()}
           />
         )}
 
@@ -1113,6 +1571,60 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de confirmação de exclusão em cascata */}
+        {!isReadOnly && cascadeDeleteModal.isOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]"
+            onClick={() => setCascadeDeleteModal({ isOpen: false, stepId: null, stepName: '', childrenCount: 0 })}
+          >
+            <div 
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-md"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-start space-x-3 mb-4">
+                <div className="bg-red-100 dark:bg-red-900/30 rounded-full p-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    Exclusão em Cascata
+                  </h3>
+                  <p className="text-gray-700 dark:text-gray-300 mb-3">
+                    A etapa <span className="font-bold">{cascadeDeleteModal.stepName}</span> possui{' '}
+                    <span className="font-bold text-red-600 dark:text-red-400">
+                      {cascadeDeleteModal.childrenCount} etapa{cascadeDeleteModal.childrenCount > 1 ? 's' : ''} filha{cascadeDeleteModal.childrenCount > 1 ? 's' : ''}
+                    </span>.
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Ao excluir esta etapa pai, todas as etapas filhas também serão excluídas permanentemente.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setCascadeDeleteModal({ isOpen: false, stepId: null, stepName: '', childrenCount: 0 })}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCascadeDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Excluir Tudo</span>
                 </button>
               </div>
             </div>

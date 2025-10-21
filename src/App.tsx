@@ -205,10 +205,10 @@ function App() {
         !sidebarCollapsed ? 'lg:ml-80' : ''
       }`}>
         {/* Header com botões de controle */}
-        <div className={`border-b px-4 py-3 flex justify-between items-center ${
+        <div className={`border-b px-4 py-3 flex justify-between items-center backdrop-blur-sm ${
           isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-gray-100 border-gray-200'
+            ? 'bg-gray-800 border-gray-700 shadow-sm' 
+            : 'bg-white border-gray-200 shadow-sm'
         }`}>
           <div className="flex items-center space-x-2">
             {/* Botão menu mobile */}

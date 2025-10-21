@@ -178,7 +178,10 @@ export const StepNode: React.FC<StepNodeProps> = ({
               </div>
             )}
             <button
-              onClick={handleViewDetails}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewDetails();
+              }}
               className="p-1 text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
               title="Ver detalhes"
             >
@@ -195,11 +198,14 @@ export const StepNode: React.FC<StepNodeProps> = ({
                   <Edit3 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={onDelete}
-                  className="p-1 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="p-1 text-gray-400 hover:!text-red-500 dark:text-gray-500 dark:hover:!text-red-500 transition-colors duration-200 relative z-10"
                   title="Excluir"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4 hover:text-red-500" />
                 </button>
               </>
             )}
@@ -208,7 +214,12 @@ export const StepNode: React.FC<StepNodeProps> = ({
 
         <div onClick={handleViewDetails} className="flex-grow flex flex-col h-full">
           <div className="flex-grow">
-            <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-2 leading-tight break-words">{step.name || stepTypes[step.type]?.label}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-2 leading-tight break-words">
+              {['capture', 'page'].includes(step.type) 
+                ? stepTypes[step.type]?.label 
+                : (step.name || stepTypes[step.type]?.label)
+              }
+            </h3>
             <p className="text-gray-600 dark:text-gray-300 text-xs mb-3 leading-relaxed">{step.description}</p>
 
             {/* Mostrar produtos de upsell para checkout */}

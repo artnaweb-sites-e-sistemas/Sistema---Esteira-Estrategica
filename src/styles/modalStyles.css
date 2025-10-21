@@ -18,11 +18,11 @@
 
 /* Estilo da scrollbar para modo escuro */
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #374151; /* Cor mais suave e harmônica */
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: #4B5563; /* Hover mais suave */
 }
 
 /* Gradiente para modo escuro */

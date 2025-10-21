@@ -169,8 +169,8 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
       {/* Header da Sidebar - Fixo */}
       <div className={`p-4 border-b flex-shrink-0 ${
         isDarkMode 
-          ? 'border-gray-700 bg-gradient-to-r from-blue-900/20 to-indigo-900/20' 
-          : 'border-gray-200 bg-gradient-to-r from-blue-100/50 to-indigo-100/50'
+          ? 'border-gray-700 bg-gradient-to-r from-blue-900/15 to-indigo-900/15' 
+          : 'border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50'
       }`}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
@@ -242,12 +242,12 @@ export const FunnelSidebar: React.FC<FunnelSidebarProps> = ({
                   className={`relative group mb-2 p-3 rounded-lg cursor-pointer transition-all ${
                     isActive 
                       ? (isDarkMode 
-                          ? 'bg-blue-900/30 border-2 border-blue-700 shadow-sm' 
+                          ? 'bg-blue-900/25 border-2 border-blue-600/50 shadow-md' 
                           : 'bg-blue-50 border-2 border-blue-200 shadow-sm'
                         )
                       : (isDarkMode 
-                          ? 'hover:bg-gray-700 border-2 border-transparent'
-                          : 'hover:bg-gray-200 border-2 border-transparent'
+                          ? 'hover:bg-gray-800/50 border-2 border-transparent hover:border-gray-700/50'
+                          : 'hover:bg-gray-100 border-2 border-transparent hover:border-gray-200'
                         )
                   }`}
                   onClick={() => !isEditing && onSelectFunnel(funnel.id)}

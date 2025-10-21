@@ -485,9 +485,13 @@ export const useFunnels = () => {
           ...funnel,
           products: funnel.products.map(product => {
             if (product.id === productId) {
+              const stepsBeforeDelete = product.steps.length;
+              const updatedSteps = product.steps.filter(step => step.id !== stepId);
+              console.log(`🗑️ Etapas antes: ${stepsBeforeDelete}, depois: ${updatedSteps.length}`);
+              console.log(`🗑️ Etapa ${stepId} foi ${stepsBeforeDelete !== updatedSteps.length ? 'DELETADA' : 'NÃO ENCONTRADA'}`);
               return {
                 ...product,
-                steps: product.steps.filter(step => step.id !== stepId)
+                steps: updatedSteps
               };
             }
             return product;
@@ -503,6 +507,7 @@ export const useFunnels = () => {
     // Salvar no Firestore
     const updatedFunnel = updatedFunnels.find(f => f.id === funnelId);
     if (updatedFunnel) {
+      console.log('🗑️ Salvando funil atualizado no Firestore após exclusão');
       await saveFunnelToFirestore(updatedFunnel, true);
     }
   };

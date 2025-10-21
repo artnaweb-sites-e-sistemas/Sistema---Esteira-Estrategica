@@ -36,6 +36,7 @@
 
 .dark .sidebar-background-dark {
   background-image: none;
+  background-color: #1A1F2E; /* Surface color harmônica */
 }
 
 .dark .products-container-solid-dark {
@@ -43,55 +44,209 @@
   background-image: none; /* Garante que nenhuma imagem de fundo sobreponha */
 }
 
-/* Ajustes de cores para o Modo Escuro */
-.dark .dark\:text-green-300 {
-    color: rgb(45 190 99) !important;
+/* ============================================
+   PALETA HARMÔNICA - DARK MODE
+   ============================================ */
+
+/* Backgrounds */
+.dark .dark\:bg-gray-900 {
+    background-color: #0F1419 !important; /* Background principal mais suave */
+}
+
+.dark .dark\:bg-gray-800 {
+    background-color: #1A1F2E !important; /* Cards e surfaces */
+}
+
+.dark .dark\:bg-gray-700 {
+    background-color: #242B3D !important; /* Elementos elevados */
 }
 
 .dark .dark\:bg-gray-900\/50 {
-    background-color: rgb(49 54 63) !important;
+    background-color: rgba(15, 20, 25, 0.5) !important;
+}
+
+/* Textos */
+.dark .dark\:text-white {
+    color: #E2E8F0 !important; /* Off-white ao invés de branco puro */
+}
+
+.dark .dark\:text-gray-300 {
+    color: #A0AEC0 !important; /* Texto secundário mais suave */
+}
+
+.dark .dark\:text-gray-400 {
+    color: #718096 !important; /* Texto terciário */
+}
+
+.dark .dark\:text-gray-500 {
+    color: #4A5568 !important;
+}
+
+/* Bordas */
+.dark .dark\:border-gray-700 {
+    border-color: #2D3748 !important; /* Bordas mais suaves */
+}
+
+.dark .dark\:border-gray-600 {
+    border-color: #374151 !important;
+}
+
+/* Cores de destaque dessaturadas para dark mode */
+.dark .dark\:text-blue-400 {
+    color: #60A5FA !important; /* Azul mais suave */
+}
+
+.dark .dark\:text-blue-500 {
+    color: #3B82F6 !important;
+}
+
+.dark .dark\:bg-blue-600 {
+    background-color: #2563EB !important;
+}
+
+.dark .dark\:bg-blue-500 {
+    background-color: #3B82F6 !important;
 }
 
 .dark .dark\:border-blue-800\/50 {
-    border-color: rgb(24 97 255) !important;
+    border-color: rgba(30, 64, 175, 0.5) !important;
 }
 
 .dark .dark\:to-indigo-900\/20 {
-    --tw-gradient-to: rgb(37 99 235) !important;
+    --tw-gradient-to: rgba(49, 46, 129, 0.2) !important;
 }
 
 .dark .dark\:from-blue-900\/20 {
-    --tw-gradient-from: rgb(18 45 124) !important;
+    --tw-gradient-from: rgba(30, 58, 138, 0.2) !important;
 }
 
-.border-blue-100 {
-    --tw-border-opacity: 1;
-    border-color: rgb(172 195 245);
-}
-
-/* Ajustes de cores para o Modo Escuro (específicos) */
-.dark .text-blue-600 {
-    color: rgb(82 132 241) !important;
-}
-
+/* Status colors - dessaturados para dark mode */
 .dark .bg-green-100 {
-    background-color: rgb(24 68 39) !important;
+    background-color: rgba(16, 185, 129, 0.15) !important; /* Verde mais suave */
 }
 
-.dark .bg-purple-100 {
-    background-color: rgb(59 16 107) !important;
+.dark .dark\:text-green-400 {
+    color: #34D399 !important;
 }
 
 .dark .bg-yellow-100 {
-    background-color: rgb(81 76 17) !important;
+    background-color: rgba(251, 191, 36, 0.15) !important; /* Amarelo mais suave */
+}
+
+.dark .dark\:text-amber-400 {
+    color: #FBBF24 !important;
 }
 
 .dark .bg-red-100 {
-    background-color: rgb(65 13 13) !important;
+    background-color: rgba(239, 68, 68, 0.15) !important; /* Vermelho mais suave */
+}
+
+.dark .dark\:text-red-400 {
+    color: #F87171 !important;
+}
+
+.dark .bg-purple-100 {
+    background-color: rgba(168, 85, 247, 0.15) !important;
 }
 
 .dark .bg-blue-100 {
-    background-color: rgb(2 12 26) !important;
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* ============================================
+   PALETA HARMÔNICA - LIGHT MODE
+   ============================================ */
+
+.bg-gray-50 {
+    background-color: #F8FAFC; /* Background mais suave que branco */
+}
+
+.border-blue-100 {
+    border-color: #DBEAFE;
+}
+
+/* ============================================
+   HOVER & INTERACTION STATES
+   ============================================ */
+
+/* Dark mode hover states */
+.dark .dark\:hover\:bg-gray-700:hover {
+    background-color: #2D3748 !important;
+}
+
+.dark .dark\:hover\:bg-gray-600:hover {
+    background-color: #374151 !important;
+}
+
+.dark .dark\:hover\:bg-blue-700:hover {
+    background-color: #1D4ED8 !important;
+}
+
+.dark .dark\:hover\:text-gray-200:hover {
+    color: #E2E8F0 !important;
+}
+
+.dark .dark\:hover\:text-gray-300:hover {
+    color: #CBD5E0 !important;
+}
+
+/* Light mode hover states */
+.hover\:bg-gray-100:hover {
+    background-color: #F1F5F9;
+}
+
+.hover\:bg-gray-200:hover {
+    background-color: #E2E8F0;
+}
+
+/* ============================================
+   SHADOWS & ELEVATION
+   ============================================ */
+
+/* Sombras mais suaves para dark mode */
+.dark .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   BORDERS & DIVIDERS
+   ============================================ */
+
+.dark .divide-gray-700 > * + * {
+    border-color: #2D3748 !important;
+}
+
+/* Border colors for specific states */
+.dark .dark\:border-blue-700 {
+    border-color: #1E40AF !important;
+}
+
+.dark .dark\:border-green-600 {
+    border-color: #059669 !important;
+}
+
+.dark .dark\:border-amber-600 {
+    border-color: #D97706 !important;
+}
+
+.dark .dark\:border-emerald-600 {
+    border-color: #059669 !important;
 }
 
 .login-background-light {
@@ -107,11 +262,6 @@
 
 .connector-circle-test {
   background-color: blue !important;
-}
-
-/* Sobrescreve a cor de fundo do bloco principal no modo dark */
-.dark .dark\:bg-gray-800 {
-    background-color: rgb(27 33 40) !important;
 }
 
 /* Remove as setas dos inputs type=number */

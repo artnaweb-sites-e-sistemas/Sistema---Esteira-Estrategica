@@ -138,3 +138,33 @@ export const marketingStrategies = [
     description: 'Estratégia personalizada'
   }
 ];
+
+// Categorias PAI (independentes ou podem ter pai)
+export const PARENT_CATEGORIES = ['capture', 'page'] as const;
+
+// Categorias FILHAS (obrigatoriamente precisam de pai)
+export const CHILD_CATEGORIES = ['checkout', 'upsell', 'crosssell', 'subscription', 'mentoring', 'membership', 'custom'] as const;
+
+// Funções auxiliares
+export const isParentCategory = (type: string): boolean => {
+  return PARENT_CATEGORIES.includes(type as any);
+};
+
+export const isChildCategory = (type: string): boolean => {
+  return CHILD_CATEGORIES.includes(type as any);
+};
+
+export const canBeParent = (type: string): boolean => {
+  return PARENT_CATEGORIES.includes(type as any);
+};
+
+// Define quais tipos de etapa podem ser pai de cada categoria
+export const getAvailableParents = (childType: string): string[] => {
+  if (childType === 'page') {
+    return ['capture']; // Página de vendas pode ter página de captura como pai (opcional)
+  }
+  if (childType === 'capture') {
+    return ['page']; // Página de captura pode ter página de vendas como pai (opcional)
+  }
+  return ['capture', 'page']; // Outras categorias filhas podem ter qualquer categoria pai
+};

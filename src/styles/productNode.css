@@ -10,6 +10,7 @@
 
 .dark .product-node-texture {
   background-image: none;
+  background-color: #1A1F2E; /* Cor de surface harmônica */
 }
 
 /* Removido o pseudo-elemento ::before e o keyframe gradient-shift */

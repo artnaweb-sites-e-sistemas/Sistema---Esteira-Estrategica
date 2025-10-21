@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { Step, StepType } from '../types';
-import { stepTypes, marketingStrategies } from '../data/stepTypes';
+import { stepTypes, marketingStrategies, isChildCategory, isParentCategory, getAvailableParents } from '../data/stepTypes';
 import { 
   X, 
   Bold, 
@@ -38,6 +38,8 @@ interface StepDetailsModalProps {
   isCreating?: boolean;
   isTrafficOnly?: boolean; // Para mostrar apenas estratégias de marketing
   isDarkMode: boolean;
+  availableParentSteps?: Step[]; // Etapas disponíveis para serem pai
+  initialParentId?: string | null; // ID do pai pré-selecionado ao criar nova etapa
 }
 
 // Tipagem para produto relacionado
@@ -58,6 +60,7 @@ interface StepFormData {
   relatedProducts: RelatedProduct[];
   isCustom: boolean;
   downsellValue?: number;
+  parentId?: string; // ID da etapa pai
 }
 
 export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
@@ -67,7 +70,9 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   onSave,
   isCreating = false,
   isTrafficOnly = false,
-  isDarkMode
+  isDarkMode,
+  availableParentSteps = [],
+  initialParentId = null
 }) => {
   const toProductObjArray = (arr: any): RelatedProduct[] => {
     if (!arr || (Array.isArray(arr) && arr.length === 0)) return [];
@@ -85,7 +90,8 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || []) : [],
     relatedProducts: toProductObjArray(step?.relatedProducts),
     isCustom: step?.isCustom || false,
-    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
+    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined,
+    parentId: step?.parentId || (initialParentId ? initialParentId : undefined)
   });
   const [initialData, setInitialData] = useState<StepFormData>({
     name: step?.name || '',
@@ -97,7 +103,8 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || []) : [],
     relatedProducts: toProductObjArray(step?.relatedProducts),
     isCustom: step?.isCustom || false,
-    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
+    downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined,
+    parentId: step?.parentId || (initialParentId ? initialParentId : undefined)
   });
   const [selectedStrategy, setSelectedStrategy] = useState(
     step?.type === 'traffic' ? (step?.notes || 'facebook-ads') : 'facebook-ads'
@@ -119,23 +126,33 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         upsellProducts: [],
         relatedProducts: [],
         isCustom: false,
-        downsellValue: undefined
+        downsellValue: undefined,
+        parentId: initialParentId || undefined
       };
       setFormData(data);
       setInitialData(data);
       setSelectedStrategy('facebook-ads');
     } else if (step && isOpen) {
+      const relatedProds = toProductObjArray(step.relatedProducts);
+      
+      // Para páginas pai, sincroniza o nome com o produto se houver
+      let stepName = step.name || '';
+      if (['capture', 'page'].includes(step.type) && relatedProds.length > 0 && relatedProds[0].name) {
+        stepName = relatedProds[0].name;
+      }
+      
       const data: StepFormData = {
-        name: step.name || '',
+        name: stepName,
         description: step.description || '',
         detailedDescription: step.detailedDescription || '',
         type: (step.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
         link: step.link || '',
         notes: step.notes || '',
         upsellProducts: step.type === 'checkout' ? (step.upsellProducts || []) : [],
-        relatedProducts: toProductObjArray(step.relatedProducts),
+        relatedProducts: relatedProds,
         isCustom: step.isCustom || false,
-        downsellValue: step.type === 'crosssell' && typeof step.downsellValue === 'number' ? step.downsellValue : undefined
+        downsellValue: step.type === 'crosssell' && typeof step.downsellValue === 'number' ? step.downsellValue : undefined,
+        parentId: step.parentId || undefined
       };
       setFormData(data);
       setInitialData(data);
@@ -143,7 +160,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         setSelectedStrategy(step.notes || 'facebook-ads');
       }
     }
-  }, [isCreating, isOpen, step, isTrafficOnly]);
+  }, [isCreating, isOpen, step, isTrafficOnly, initialParentId]);
 
   const isDirty = () => {
     return JSON.stringify(formData) !== JSON.stringify(initialData);
@@ -151,8 +168,21 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
 
   const handleSave = (event?: React.FormEvent) => {
     if (event) event.preventDefault();
+    
+    // Validação: categorias filhas DEVEM ter um pai
+    if (isChildCategory(formData.type) && !formData.parentId) {
+      alert('Esta categoria precisa estar vinculada a uma etapa pai (Página de Captura ou Página de Vendas)');
+      return;
+    }
+    
     const { downsellValue: formDownsellValue, relatedProducts, ...restFormData } = formData;
     let dataToSave: Partial<Step> = { ...restFormData };
+    
+    // Remover parentId se for undefined ou vazio (para páginas independentes)
+    if (!dataToSave.parentId || dataToSave.parentId === '') {
+      delete dataToSave.parentId;
+    }
+    
     if (formData.type === 'crosssell') {
       dataToSave.downsellValue = typeof formDownsellValue === 'number' && !isNaN(formDownsellValue) && formDownsellValue > 0 ? formDownsellValue : undefined;
       if (formData.relatedProducts.length > 1) {
@@ -219,17 +249,35 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   };
 
   const removeRelatedProduct = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      relatedProducts: (prev.relatedProducts as RelatedProduct[]).filter((_: RelatedProduct, i: number) => i !== index)
-    }));
+    setFormData(prev => {
+      const updatedProducts = (prev.relatedProducts as RelatedProduct[]).filter((_: RelatedProduct, i: number) => i !== index);
+      
+      // Se for página pai (capture ou page) e remover o único produto, limpa o nome da etapa
+      const shouldClearStepName = ['capture', 'page'].includes(prev.type) && index === 0 && updatedProducts.length === 0;
+      
+      return {
+        ...prev,
+        relatedProducts: updatedProducts,
+        ...(shouldClearStepName ? { name: '' } : {})
+      };
+    });
   };
 
   const updateRelatedProduct = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      relatedProducts: (prev.relatedProducts as RelatedProduct[]).map((product: RelatedProduct, i: number) => i === index ? { ...product, name: value } : product)
-    }));
+    setFormData(prev => {
+      const updatedProducts = (prev.relatedProducts as RelatedProduct[]).map((product: RelatedProduct, i: number) => 
+        i === index ? { ...product, name: value } : product
+      );
+      
+      // Se for página pai (capture ou page), atualiza o nome da etapa com o nome do produto
+      const shouldUpdateStepName = ['capture', 'page'].includes(prev.type) && index === 0;
+      
+      return {
+        ...prev,
+        relatedProducts: updatedProducts,
+        ...(shouldUpdateStepName ? { name: value } : {})
+      };
+    });
   };
 
   const insertMarkdown = (before: string, after: string = '') => {
@@ -386,6 +434,80 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
             </div>
           )}
 
+          {/* Seleção de Etapa Pai */}
+          {!isTrafficOnly && (isChildCategory(formData.type) || formData.type === 'page' || formData.type === 'capture') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {formData.type === 'page' ? 'Página de Captura (opcional)' : formData.type === 'capture' ? 'Página de Vendas (opcional)' : 'Etapa Pai *'}
+              </label>
+              
+              {(() => {
+                const allowedParentTypes = getAvailableParents(formData.type);
+                const filteredParents = availableParentSteps.filter(s => 
+                  allowedParentTypes.includes(s.type)
+                );
+
+                if (filteredParents.length === 0 && isChildCategory(formData.type)) {
+                  return (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                        ⚠️ Não há etapas pai disponíveis
+                      </p>
+                      <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                        Você precisa criar uma Página de Captura ou Página de Vendas primeiro.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <select
+                    value={formData.parentId || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        parentId: value === '' ? undefined : value 
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required={isChildCategory(formData.type)}
+                  >
+                    <option value="">
+                      {formData.type === 'page' || formData.type === 'capture' ? 'Nenhuma (independente)' : 'Selecione uma etapa pai'}
+                    </option>
+                    {filteredParents.map(parentStep => {
+                      // Para páginas pai, pega o nome do produto (primeiro produto relacionado)
+                      let displayName = parentStep.name || 'Sem nome';
+                      if (['capture', 'page'].includes(parentStep.type)) {
+                        const productName = parentStep.relatedProducts && parentStep.relatedProducts.length > 0 
+                          ? parentStep.relatedProducts[0] 
+                          : null;
+                        if (typeof productName === 'string' && productName) {
+                          displayName = productName;
+                        } else if (productName && typeof productName === 'object' && 'name' in productName && productName.name) {
+                          displayName = productName.name;
+                        }
+                      }
+                      
+                      return (
+                        <option key={parentStep.id} value={parentStep.id}>
+                          {stepTypes[parentStep.type]?.label || parentStep.type} - {displayName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                );
+              })()}
+              
+              {isChildCategory(formData.type) && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Esta categoria precisa estar vinculada a uma Página de Captura ou Página de Vendas
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Produtos de Upsell (apenas para checkout) */}
           {formData.type === 'checkout' && (
             <div>
@@ -479,9 +601,13 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={addRelatedProduct}
-                      disabled={formData.type === 'crosssell' && formData.relatedProducts.length >= 1}
+                      disabled={
+                        (formData.type === 'crosssell' && formData.relatedProducts.length >= 1) ||
+                        (['capture', 'page'].includes(formData.type) && formData.relatedProducts.length >= 1)
+                      }
                       className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm ${
-                        formData.type === 'crosssell' && formData.relatedProducts.length >= 1
+                        ((formData.type === 'crosssell' && formData.relatedProducts.length >= 1) ||
+                        (['capture', 'page'].includes(formData.type) && formData.relatedProducts.length >= 1))
                           ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
