@@ -69,9 +69,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
   isTrafficOnly = false,
   isDarkMode
 }) => {
-  const toProductObjArray = (arr: any): RelatedProduct[] => (arr && Array.isArray(arr) && typeof arr[0] === 'object')
-    ? arr as RelatedProduct[]
-    : (arr || ['']).map((name: string) => ({ id: crypto.randomUUID(), name }));
+  const toProductObjArray = (arr: any): RelatedProduct[] => {
+    if (!arr || (Array.isArray(arr) && arr.length === 0)) return [];
+    if (Array.isArray(arr) && typeof arr[0] === 'object') return arr as RelatedProduct[];
+    return arr.map((name: string) => ({ id: crypto.randomUUID(), name }));
+  };
 
   const [formData, setFormData] = useState<StepFormData>({
     name: step?.name || '',
@@ -80,7 +82,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     type: (step?.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
     link: step?.link || '',
     notes: step?.notes || '',
-    upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
+    upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || []) : [],
     relatedProducts: toProductObjArray(step?.relatedProducts),
     isCustom: step?.isCustom || false,
     downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
@@ -92,7 +94,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
     type: (step?.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
     link: step?.link || '',
     notes: step?.notes || '',
-    upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || ['']) : [],
+    upsellProducts: step?.type === 'checkout' ? (step?.upsellProducts || []) : [],
     relatedProducts: toProductObjArray(step?.relatedProducts),
     isCustom: step?.isCustom || false,
     downsellValue: step?.type === 'crosssell' && typeof step?.downsellValue === 'number' ? step.downsellValue : undefined
@@ -114,8 +116,8 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         type: (isTrafficOnly ? 'traffic' : 'page') as StepType,
         link: '',
         notes: '',
-        upsellProducts: [''],
-        relatedProducts: [{ id: crypto.randomUUID(), name: '' }],
+        upsellProducts: [],
+        relatedProducts: [],
         isCustom: false,
         downsellValue: undefined
       };
@@ -130,7 +132,7 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
         type: (step.type as StepType) || (isTrafficOnly ? 'traffic' : 'page'),
         link: step.link || '',
         notes: step.notes || '',
-        upsellProducts: step.type === 'checkout' ? (step.upsellProducts || ['']) : [],
+        upsellProducts: step.type === 'checkout' ? (step.upsellProducts || []) : [],
         relatedProducts: toProductObjArray(step.relatedProducts),
         isCustom: step.isCustom || false,
         downsellValue: step.type === 'crosssell' && typeof step.downsellValue === 'number' ? step.downsellValue : undefined
@@ -391,6 +393,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
                 Produtos de Order Bump
               </label>
               <div className="space-y-3">
+                {formData.upsellProducts.length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    Nenhum produto adicionado. Clique no botão abaixo para adicionar.
+                  </p>
+                )}
                 {formData.upsellProducts.map((product, index) => (
                   <div key={index} className="flex items-center space-x-2">
                     <input
@@ -430,6 +437,11 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={(formData.relatedProducts as RelatedProduct[]).map(getProductItemId)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
+                    {(formData.relatedProducts as RelatedProduct[]).length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        Nenhum produto adicionado. Clique no botão abaixo para adicionar.
+                      </p>
+                    )}
                     {(formData.relatedProducts as RelatedProduct[]).map((product: RelatedProduct, index: number) => {
                       const itemId = getProductItemId(product);
                       if (formData.type === 'crosssell') {
@@ -441,8 +453,14 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
                               onChange={(e) => updateRelatedProduct(index, e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                               placeholder="Nome do Produto"
-                              disabled={index > 0}
                             />
+                            <button
+                              type="button"
+                              onClick={() => removeRelatedProduct(index)}
+                              className="p-2 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         );
                       }
@@ -454,20 +472,23 @@ export const StepDetailsModal: React.FC<StepDetailsModalProps> = ({
                           value={product.name}
                           onChange={updateRelatedProduct}
                           onRemove={removeRelatedProduct}
-                          canRemove={(formData.relatedProducts as RelatedProduct[]).length > 1}
+                          canRemove={true}
                         />
                       );
                     })}
-                    {formData.type !== 'crosssell' && (
-                      <button
-                        type="button"
-                        onClick={addRelatedProduct}
-                        className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Adicionar Produto</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={addRelatedProduct}
+                      disabled={formData.type === 'crosssell' && formData.relatedProducts.length >= 1}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm ${
+                        formData.type === 'crosssell' && formData.relatedProducts.length >= 1
+                          ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Adicionar Produto</span>
+                    </button>
                   </div>
                 </SortableContext>
               </DndContext>

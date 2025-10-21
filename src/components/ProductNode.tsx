@@ -131,6 +131,19 @@ const SortableProductCard = React.memo(function SortableProductCard({ productIte
     transition,
     isDragging
   } = useSortable({ id: productItem.id });
+  
+  // Define a cor da borda baseada no status
+  const getBorderClass = () => {
+    switch (productItem.status) {
+      case 'completed':
+        return 'border-green-500 dark:border-green-600 border-2';
+      case 'in-progress':
+        return 'border-amber-500 dark:border-amber-600 border-2';
+      default:
+        return 'border-blue-200 dark:border-blue-700 border';
+    }
+  };
+  
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition || 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -143,7 +156,7 @@ const SortableProductCard = React.memo(function SortableProductCard({ productIte
       style={style}
       {...listeners}
       {...attributes}
-      className={`bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700 shadow-sm hover:shadow-md transition-all cursor-pointer group relative flex flex-col h-full transition-transform duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+      className={`bg-white dark:bg-gray-800 rounded-lg p-4 ${getBorderClass()} shadow-sm hover:shadow-md transition-all cursor-pointer group relative flex flex-col h-full transition-transform duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
       onClick={() => handleProductItemClick(productItem)}
     >
       {/* Botões de ação - apenas se não for somente leitura */}
@@ -799,8 +812,79 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
               </div>
             </div>
 
-            {/* Estratégias de Marketing */}
+            {/* Etapas do Funil */}
             <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Etapas do Funil</h3>
+                  <div className="flex-1 h-px bg-gradient-to-r from-green-300 dark:from-green-600 to-transparent ml-4"></div>
+                </div>
+                {!isReadOnly && (
+                  <button
+                    onClick={() => {
+                      setIsTrafficOnly(false);
+                      setShowCreateStepModal(true);
+                    }}
+                    className="ml-4 flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Nova Etapa</span>
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+                {otherSteps.map((step, index) => (
+                  <div key={step.id} className="relative h-full">
+                    <StepNode
+                      step={step}
+                      onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(step.id, updates)}
+                      onDelete={isReadOnly ? () => {} : () => onDeleteStep(step.id)}
+                      onEdit={() => handleStepEdit(step)}
+                      isDarkMode={isDarkMode}
+                      isReadOnly={isReadOnly}
+                      isDashedBorder={true}
+                      className="h-full"
+                    />
+                    {/* Connection arrows between steps */}
+                    {index < otherSteps.length - 1 && (
+                      <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
+                        {/* Line */}
+                        <div className="w-4 h-[2px] bg-teal-500"></div>
+                        {/* Arrow circle */}
+                        <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
+                          <div className="shimmer-bg absolute inset-0"></div>
+                          <ChevronsRight size={16} className="text-white" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {/* Card vazio para adicionar etapa personalizada - apenas se não for somente leitura */}
+                {!isReadOnly && (
+                  <div 
+                    onClick={() => {
+                      setIsTrafficOnly(false);
+                      setShowCreateStepModal(true);
+                    }}
+                    className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group h-full"
+                  >
+                    <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-green-200 dark:group-hover:bg-green-800 rounded-full p-3 mb-3 transition-colors">
+                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400" />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 font-medium text-sm">
+                      Adicionar Etapa
+                    </p>
+                    <p className="text-gray-400 dark:text-gray-500 group-hover:text-green-500 dark:group-hover:text-green-500 text-xs text-center mt-1">
+                      Clique para criar uma nova etapa do funil
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Estratégias de Marketing */}
+            <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center flex-1">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Estratégias de Marketing</h3>
@@ -898,77 +982,6 @@ export const ProductNode: React.FC<ProductNodeProps> = ({
                   ) : null}
                 </DragOverlay>
               </DndContext>
-            </div>
-
-            {/* Etapas do Funil */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Etapas do Funil</h3>
-                  <div className="flex-1 h-px bg-gradient-to-r from-green-300 dark:from-green-600 to-transparent ml-4"></div>
-                </div>
-                {!isReadOnly && (
-                  <button
-                    onClick={() => {
-                      setIsTrafficOnly(false);
-                      setShowCreateStepModal(true);
-                    }}
-                    className="ml-4 flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Nova Etapa</span>
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
-                {otherSteps.map((step, index) => (
-                  <div key={step.id} className="relative h-full">
-                    <StepNode
-                      step={step}
-                      onUpdate={isReadOnly ? () => {} : (updates) => onUpdateStep(step.id, updates)}
-                      onDelete={isReadOnly ? () => {} : () => onDeleteStep(step.id)}
-                      onEdit={() => handleStepEdit(step)}
-                      isDarkMode={isDarkMode}
-                      isReadOnly={isReadOnly}
-                      isDashedBorder={true}
-                      className="h-full"
-                    />
-                    {/* Connection arrows between steps */}
-                    {index < otherSteps.length - 1 && (
-                      <div className="hidden lg:flex absolute top-1/2 left-full transform -translate-y-1/2 z-10 items-center w-8">
-                        {/* Line */}
-                        <div className="w-4 h-[2px] bg-teal-500"></div>
-                        {/* Arrow circle */}
-                        <div className="bg-teal-500 rounded-full p-1 shadow-md flex-shrink-0 relative overflow-hidden ml-[-2px]">
-                          <div className="shimmer-bg absolute inset-0"></div>
-                          <ChevronsRight size={16} className="text-white" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                
-                {/* Card vazio para adicionar etapa personalizada - apenas se não for somente leitura */}
-                {!isReadOnly && (
-                  <div 
-                    onClick={() => {
-                      setIsTrafficOnly(false);
-                      setShowCreateStepModal(true);
-                    }}
-                    className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group h-full"
-                  >
-                    <div className="bg-gray-200 dark:bg-gray-700 group-hover:bg-green-200 dark:group-hover:bg-green-800 rounded-full p-3 mb-3 transition-colors">
-                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400" />
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 group-hover:text-green-600 dark:group-hover:text-green-400 font-medium text-sm">
-                      Adicionar Etapa
-                    </p>
-                    <p className="text-gray-400 dark:text-gray-500 group-hover:text-green-500 dark:group-hover:text-green-500 text-xs text-center mt-1">
-                      Clique para criar uma nova etapa do funil
-                    </p>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         )}
